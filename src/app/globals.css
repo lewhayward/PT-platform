@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+/*
+  Calm, premium colour palette for the PT platform.
+  Warm off-white surfaces, soft sage-green accent (not a loud "gym" red),
+  muted text tones. Each variable has a light and dark value below.
+*/
+:root {
+  --background: #faf9f7;
+  --surface: #ffffff;
+  --foreground: #1c1c1a;
+  --muted: #6b6b65;
+  --border: #e4e2dd;
+
+  --accent: #4b6455;
+  --accent-hover: #3e5347;
+  --accent-foreground: #ffffff;
+
+  --danger: #b3413d;
+  --danger-foreground: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #121210;
+    --surface: #1a1a17;
+    --foreground: #f2f1ed;
+    --muted: #9c9b94;
+    --border: #2e2e29;
+
+    --accent: #7fa08c;
+    --accent-hover: #93b3a0;
+    --accent-foreground: #10231a;
+
+    --danger: #d97874;
+    --danger-foreground: #2a0d0b;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
