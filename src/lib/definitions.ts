@@ -44,3 +44,47 @@ export type LoginFormState =
       message?: string;
     }
   | undefined;
+
+export const InviteClientSchema = z.object({
+  fullName: z
+    .string()
+    .min(2, { error: "Please enter the client's full name." })
+    .trim(),
+  email: z.email({ error: "Please enter a valid email address." }).trim(),
+  goals: z.string().trim().optional(),
+  notes: z.string().trim().optional(),
+});
+
+export type InviteClientFormState =
+  | {
+      errors?: {
+        fullName?: string[];
+        email?: string[];
+        goals?: string[];
+        notes?: string[];
+      };
+      message?: string;
+    }
+  | undefined;
+
+export const SetPasswordSchema = z
+  .object({
+    password: z
+      .string()
+      .min(8, { error: "Password must be at least 8 characters." }),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match.",
+    path: ["confirmPassword"],
+  });
+
+export type SetPasswordFormState =
+  | {
+      errors?: {
+        password?: string[];
+        confirmPassword?: string[];
+      };
+      message?: string;
+    }
+  | undefined;

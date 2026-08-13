@@ -3,14 +3,17 @@
 A web app for personal trainers to manage clients, workouts, nutrition and
 progress tracking in one place.
 
-**Phase 1 (this version) covers:** account sign-up/login for both trainers
-and clients, and an empty dashboard shell for each. No client management,
-workouts, or nutrition features yet - those come in later phases.
+**Covers so far:**
+- **Phase 1**: account sign-up/login for both trainers and clients
+- **Phase 2**: trainers can invite clients by email, see their client list, and open a client's profile
+
+No workout, nutrition, or progress-tracking features yet - those come in later phases.
 
 ## 1. Create your Supabase project
 
 1. Go to [supabase.com](https://supabase.com), sign in, and click "New project".
-2. Once it's created, open **Settings -> API** in the left sidebar. You'll need two values from this page in a moment: the **Project URL** and the **anon public** key.
+2. Once it's created, open **Settings -> API** in the left sidebar. You'll need three values from this page in a moment: the **Project URL**, the **Publishable key** (also called "anon" key), and the **Secret key**.
+   - The Secret key gives full admin access to your database - never paste it into `NEXT_PUBLIC_...` anything, and never put it anywhere a browser could see it.
 
 ## 2. Set up the database
 
@@ -18,9 +21,9 @@ workouts, or nutrition features yet - those come in later phases.
 2. Open the file `supabase/schema.sql` in this project, copy its entire contents, and paste it into the SQL Editor.
 3. Click **Run**.
 
-This creates a `profiles` table that stores whether each person is a
-"trainer" or a "client", and wires it up so a profile row is created
-automatically whenever someone signs up.
+This creates:
+- a `profiles` table that stores whether each person is a "trainer" or a "client" (with a profile row created automatically whenever someone signs up)
+- a `trainer_clients` table linking each trainer to the clients they've invited, with email, goals, notes, and a status (Invited / Active)
 
 ## 3. Add your environment variables
 
@@ -28,11 +31,23 @@ automatically whenever someone signs up.
    ```bash
    cp .env.example .env.local
    ```
-2. Open `.env.local` and paste in the **Project URL** and **anon public** key from step 1.
+2. Open `.env.local` and paste in the **Project URL**, **Publishable key**, and **Secret key** from step 1.
 
 `.env.local` is never committed to git (it's listed in `.gitignore`), so your keys stay private.
 
-## 4. Run the app
+## 4. Configure the invite email (needed for Phase 2)
+
+Inviting a client sends them an email with a link to set up their account. By default, Supabase's invite link doesn't work with this app's link-handling page, so it needs a one-time tweak:
+
+1. In Supabase, go to **Authentication -> Email Templates -> Invite user**.
+2. Find the link in the template (it looks like `{{ .ConfirmationURL }}`) and replace it with:
+   ```
+   {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type={{ .Type }}&next={{ .RedirectTo }}
+   ```
+3. Save.
+4. Still in Supabase, go to **Authentication -> URL Configuration** and make sure your app's URL is in **Redirect URLs** as a wildcard, e.g. `https://yourapp.vercel.app/**` (or `http://localhost:3000/**` for local development). This lets Supabase redirect to any page in the app, not just the exact homepage.
+
+## 5. Run the app
 
 ```bash
 npm install
@@ -52,13 +67,30 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 6. **Check the role guard**: while logged in as a client, try visiting `/trainer` directly in the address bar - you should be redirected to `/client` instead of seeing the trainer dashboard (and vice versa).
 7. **Check the redirect guard**: while logged out, try visiting `/trainer` or `/client` directly - you should be redirected to `/login`.
 
-If all of that works, Phase 1 is solid and we can move on to Phase 2 (client management).
+If all of that works, Phase 1 is solid.
+
+## How to test Phase 2
+
+1. **Log in as a trainer**, then click **Add client** on the dashboard.
+2. Fill in a client's name, email (use a real inbox you can check), and optionally goals/notes, then **Send invite**. You should land back on your client list, showing them as **Invited**.
+3. **Check the invite email** - it should arrive addressed to the client, with a link to set a password.
+4. Click that link. It should open **Set your password**, already signed in as the new client account.
+5. Set a password. You should land on the (empty) client dashboard.
+6. Back on the trainer's client list, refresh - that client should now show as **Active**.
+7. Click into that client from the list - you should see their profile page with the goals/notes you entered.
+8. **Check the guard**: while logged in as a different trainer (or logged out), try visiting another trainer's client profile URL directly - you should get a "not found" page, not their data.
+
+If all of that works, Phase 2 is solid and we can move on to Phase 3 (workout programming).
 
 ## Project structure
 
 - `src/app/` - pages and routes (Next.js App Router)
 - `src/app/auth/actions.ts` - sign-up, login, and logout logic
-- `src/lib/supabase/` - Supabase client setup and the "Data Access Layer" (`dal.ts`) that checks who's logged in
+- `src/app/trainer/clients/actions.ts` - inviting a client
+- `src/app/invite/actions.ts` - a newly-invited client setting their password
+- `src/lib/supabase/server.ts` / `client.ts` - the regular Supabase clients (respect Row Level Security)
+- `src/lib/supabase/admin.ts` - the admin client (secret key, bypasses security rules) - only ever used server-side, only for inviting users
+- `src/lib/supabase/dal.ts` - the "Data Access Layer" that checks who's logged in and what they're allowed to see
 - `src/proxy.ts` - runs before every page request to keep sessions fresh and enforce redirects (Next.js 16 renamed "middleware" to "proxy")
 - `src/components/` - shared, reusable pieces of UI
 - `supabase/schema.sql` - the database setup script from step 2 above

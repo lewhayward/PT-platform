@@ -8,3 +8,16 @@ export interface Profile {
   full_name: string | null;
   created_at: string;
 }
+
+export type TrainerClientStatus = "invited" | "active";
+
+export interface TrainerClient {
+  id: string;
+  trainer_id: string;
+  client_id: string;
+  email: string;
+  goals: string | null;
+  notes: string | null;
+  status: TrainerClientStatus;
+  created_at: string;
+}

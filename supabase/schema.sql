@@ -80,3 +80,61 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- ============================================================================
+-- Phase 2 - client management
+-- ============================================================================
+
+-- Once a trainer invites someone, they show up as "invited". Once that
+-- person clicks the email link and sets a password, they become "active".
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'trainer_client_status') then
+    create type public.trainer_client_status as enum ('invited', 'active');
+  end if;
+end $$;
+
+-- Links a trainer to one of their clients. The client's name lives on their
+-- own profiles row (client_id below); email is copied here too so the
+-- trainer's client list can be shown without needing admin-only access to
+-- auth.users.
+create table if not exists public.trainer_clients (
+  id uuid primary key default gen_random_uuid(),
+  trainer_id uuid not null references public.profiles (id) on delete cascade,
+  client_id uuid not null references public.profiles (id) on delete cascade,
+  email text not null,
+  goals text,
+  notes text,
+  status public.trainer_client_status not null default 'invited',
+  created_at timestamptz not null default now(),
+  unique (trainer_id, client_id)
+);
+
+alter table public.trainer_clients enable row level security;
+
+drop policy if exists "Trainers can view own clients" on public.trainer_clients;
+create policy "Trainers can view own clients"
+  on public.trainer_clients for select
+  using (auth.uid() = trainer_id);
+
+drop policy if exists "Trainers can add own clients" on public.trainer_clients;
+create policy "Trainers can add own clients"
+  on public.trainer_clients for insert
+  with check (auth.uid() = trainer_id);
+
+drop policy if exists "Trainers can update own clients" on public.trainer_clients;
+create policy "Trainers can update own clients"
+  on public.trainer_clients for update
+  using (auth.uid() = trainer_id);
+
+-- Lets a newly-invited client see and activate their own row (see the
+-- set-password step) without giving them access to any other trainer's data.
+drop policy if exists "Clients can view own client row" on public.trainer_clients;
+create policy "Clients can view own client row"
+  on public.trainer_clients for select
+  using (auth.uid() = client_id);
+
+drop policy if exists "Clients can activate own client row" on public.trainer_clients;
+create policy "Clients can activate own client row"
+  on public.trainer_clients for update
+  using (auth.uid() = client_id);

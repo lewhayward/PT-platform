@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
+  const next = searchParams.get("next");
 
   const supabase = await createClient();
 
@@ -26,6 +27,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(
       `${origin}/login?error=confirmation-failed`
     );
+  }
+
+  // Some links (e.g. a client invite) need to land somewhere other than the
+  // usual dashboard, like the "set your password" page. Only ever follow a
+  // same-site path here, since `next` comes from a URL.
+  if (next && next.startsWith("/") && !next.startsWith("//")) {
+    return NextResponse.redirect(`${origin}${next}`);
   }
 
   const { data: userData } = await supabase.auth.getUser();
