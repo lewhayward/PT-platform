@@ -35,17 +35,14 @@ This creates:
 
 `.env.local` is never committed to git (it's listed in `.gitignore`), so your keys stay private.
 
-## 4. Configure the invite email (needed for Phase 2)
+## 4. Allow the invite redirect (needed for Phase 2)
 
-Inviting a client sends them an email with a link to set up their account. By default, Supabase's invite link doesn't work with this app's link-handling page, so it needs a one-time tweak:
+Inviting a client sends them an email with a link to set up their account. Supabase only allows redirecting to URLs you've explicitly approved, so:
 
-1. In Supabase, go to **Authentication -> Email Templates -> Invite user**.
-2. Find the link in the template (it looks like `{{ .ConfirmationURL }}`) and replace it with:
-   ```
-   {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type={{ .Type }}&next={{ .RedirectTo }}
-   ```
-3. Save.
-4. Still in Supabase, go to **Authentication -> URL Configuration** and make sure your app's URL is in **Redirect URLs** as a wildcard, e.g. `https://yourapp.vercel.app/**` (or `http://localhost:3000/**` for local development). This lets Supabase redirect to any page in the app, not just the exact homepage.
+1. In Supabase, go to **Authentication -> URL Configuration**.
+2. Under **Redirect URLs**, add your app's URL as a wildcard, e.g. `https://yourapp.vercel.app/**` (or `http://localhost:3000/**` for local development). This lets Supabase redirect to any page in the app, not just the exact homepage.
+
+(No email template editing is needed - customising templates requires setting up your own SMTP provider, which isn't necessary for this app.)
 
 ## 5. Run the app
 
