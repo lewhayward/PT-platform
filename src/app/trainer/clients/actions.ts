@@ -57,6 +57,14 @@ export async function inviteClient(
     };
   }
 
+  // The profiles.full_name trigger reads from auth.users at the moment it's
+  // inserted, which isn't reliably populated yet for admin-created invites.
+  // Set it explicitly here instead of trusting that timing.
+  await admin
+    .from("profiles")
+    .update({ full_name: fullName })
+    .eq("id", data.user.id);
+
   const supabase = await createClient();
   const { error: insertError } = await supabase
     .from("trainer_clients")
