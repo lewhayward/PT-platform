@@ -139,6 +139,22 @@ create policy "Clients can activate own client row"
   on public.trainer_clients for update
   using (auth.uid() = client_id);
 
+-- Trainers could only ever see their OWN profile row (see "Users can view
+-- own profile" above) - which silently blocked the trainer's client list
+-- and client profile pages from reading a client's name at all. This lets
+-- a trainer view the profile of anyone they've actually invited, and no one
+-- else's.
+drop policy if exists "Trainers can view their clients' profiles" on public.profiles;
+create policy "Trainers can view their clients' profiles"
+  on public.profiles for select
+  using (
+    exists (
+      select 1 from public.trainer_clients
+      where trainer_clients.client_id = profiles.id
+      and trainer_clients.trainer_id = auth.uid()
+    )
+  );
+
 -- When a trainer invites someone, the new profiles row is created by the
 -- on_auth_user_created trigger before the trainer's own request gets a
 -- chance to set their name. "security definer" means this function runs
