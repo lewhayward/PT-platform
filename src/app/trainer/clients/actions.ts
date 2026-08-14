@@ -57,15 +57,18 @@ export async function inviteClient(
     };
   }
 
+  const supabase = await createClient();
+
   // The profiles.full_name trigger reads from auth.users at the moment it's
   // inserted, which isn't reliably populated yet for admin-created invites.
-  // Set it explicitly here instead of trusting that timing.
-  await admin
-    .from("profiles")
-    .update({ full_name: fullName })
-    .eq("id", data.user.id);
+  // Set it explicitly via this narrow database function instead of trusting
+  // that timing (a trainer's own session isn't otherwise allowed to edit
+  // someone else's profile - see set_invited_client_name in schema.sql).
+  await supabase.rpc("set_invited_client_name", {
+    target_client_id: data.user.id,
+    new_full_name: fullName,
+  });
 
-  const supabase = await createClient();
   const { error: insertError } = await supabase
     .from("trainer_clients")
     .insert({

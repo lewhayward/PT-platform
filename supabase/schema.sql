@@ -138,3 +138,23 @@ drop policy if exists "Clients can activate own client row" on public.trainer_cl
 create policy "Clients can activate own client row"
   on public.trainer_clients for update
   using (auth.uid() = client_id);
+
+-- When a trainer invites someone, the new profiles row is created by the
+-- on_auth_user_created trigger before the trainer's own request gets a
+-- chance to set their name. "security definer" means this function runs
+-- with the permissions of the person who created it (not the trainer
+-- calling it), so it can update someone else's profile safely - but only
+-- ever this one field, and only right after an invite.
+create or replace function public.set_invited_client_name(
+  target_client_id uuid,
+  new_full_name text
+)
+returns void as $$
+begin
+  update public.profiles
+  set full_name = new_full_name
+  where id = target_client_id and role = 'client';
+end;
+$$ language plpgsql security definer set search_path = public;
+
+grant execute on function public.set_invited_client_name(uuid, text) to authenticated;
