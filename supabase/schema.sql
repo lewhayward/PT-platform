@@ -160,7 +160,8 @@ create policy "Trainers can view their clients' profiles"
 -- chance to set their name. "security definer" means this function runs
 -- with the permissions of the person who created it (not the trainer
 -- calling it), so it can update someone else's profile safely - but only
--- ever this one field, and only right after an invite.
+-- ever this one field, only for someone who is actually their own client,
+-- and only right after an invite.
 create or replace function public.set_invited_client_name(
   target_client_id uuid,
   new_full_name text
@@ -169,8 +170,294 @@ returns void as $$
 begin
   update public.profiles
   set full_name = new_full_name
-  where id = target_client_id and role = 'client';
+  where id = target_client_id
+    and role = 'client'
+    and exists (
+      select 1 from public.trainer_clients
+      where trainer_clients.client_id = target_client_id
+      and trainer_clients.trainer_id = auth.uid()
+    );
 end;
 $$ language plpgsql security definer set search_path = public;
 
 grant execute on function public.set_invited_client_name(uuid, text) to authenticated;
+
+-- ============================================================================
+-- Phase 3 - workout programming
+-- ============================================================================
+
+-- Captured on the "Add client" form. Used to suggest a matching starter
+-- programme (see programme_templates below) - the free-text goals/notes
+-- fields already on trainer_clients are for qualitative detail; these two
+-- are structured so they can be matched against.
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'client_goal') then
+    create type public.client_goal as enum ('bodybuilding', 'fat_loss', 'general_fitness', 'strength');
+  end if;
+end $$;
+
+alter table public.trainer_clients add column if not exists goal public.client_goal;
+alter table public.trainer_clients add column if not exists days_per_week smallint check (days_per_week between 1 and 7);
+
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'muscle_group') then
+    create type public.muscle_group as enum ('chest', 'back', 'shoulders', 'arms', 'legs', 'core', 'cardio', 'full_body');
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'day_of_week') then
+    create type public.day_of_week as enum ('mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun');
+  end if;
+end $$;
+
+-- The exercise library. Shared reference data (not owned by any one
+-- trainer) that everyone signed in can browse when building a workout.
+create table if not exists public.exercises (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  muscle_group public.muscle_group not null,
+  equipment text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.exercises enable row level security;
+
+drop policy if exists "Anyone signed in can view exercises" on public.exercises;
+create policy "Anyone signed in can view exercises"
+  on public.exercises for select
+  to authenticated
+  using (true);
+
+-- A reusable single-day workout (e.g. "Push Day A"). Either a trainer's own
+-- saved template (trainer_id set - built from a day they've already put
+-- together and chosen to save, see the app's "Save as template" action), or
+-- a starter template we ship with the app (trainer_id null).
+create table if not exists public.workout_templates (
+  id uuid primary key default gen_random_uuid(),
+  trainer_id uuid references public.profiles (id) on delete cascade,
+  name text not null,
+  created_at timestamptz not null default now()
+);
+
+create unique index if not exists workout_templates_starter_name_idx
+  on public.workout_templates (name)
+  where trainer_id is null;
+
+alter table public.workout_templates enable row level security;
+
+drop policy if exists "Trainers can view own or starter templates" on public.workout_templates;
+create policy "Trainers can view own or starter templates"
+  on public.workout_templates for select
+  to authenticated
+  using (auth.uid() = trainer_id or trainer_id is null);
+
+drop policy if exists "Trainers can manage own templates" on public.workout_templates;
+create policy "Trainers can manage own templates"
+  on public.workout_templates for all
+  using (auth.uid() = trainer_id)
+  with check (auth.uid() = trainer_id);
+
+create table if not exists public.workout_template_exercises (
+  id uuid primary key default gen_random_uuid(),
+  template_id uuid not null references public.workout_templates (id) on delete cascade,
+  exercise_id uuid references public.exercises (id),
+  custom_name text,
+  sets smallint not null,
+  reps text not null,
+  weight text,
+  notes text,
+  order_index smallint not null default 0,
+  check (exercise_id is not null or custom_name is not null)
+);
+
+alter table public.workout_template_exercises enable row level security;
+
+drop policy if exists "View exercises of visible templates" on public.workout_template_exercises;
+create policy "View exercises of visible templates"
+  on public.workout_template_exercises for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.workout_templates
+      where workout_templates.id = workout_template_exercises.template_id
+      and (workout_templates.trainer_id = auth.uid() or workout_templates.trainer_id is null)
+    )
+  );
+
+drop policy if exists "Manage exercises of own templates" on public.workout_template_exercises;
+create policy "Manage exercises of own templates"
+  on public.workout_template_exercises for all
+  using (
+    exists (
+      select 1 from public.workout_templates
+      where workout_templates.id = workout_template_exercises.template_id
+      and workout_templates.trainer_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.workout_templates
+      where workout_templates.id = workout_template_exercises.template_id
+      and workout_templates.trainer_id = auth.uid()
+    )
+  );
+
+-- A starter programme we ship with the app (e.g. "Bodybuilding - 3 days a
+-- week - Push/Pull/Legs"), suggested to a trainer based on a client's goal
+-- and days_per_week when they haven't built a programme for that client yet.
+create table if not exists public.programme_templates (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  goal public.client_goal not null,
+  days_per_week smallint not null check (days_per_week between 1 and 7),
+  description text,
+  created_at timestamptz not null default now(),
+  -- Exactly one suggested template per goal + frequency combination, so
+  -- looking up "the" recommended template for a client can never match
+  -- more than one row.
+  unique (goal, days_per_week)
+);
+
+alter table public.programme_templates enable row level security;
+
+drop policy if exists "Everyone can view programme templates" on public.programme_templates;
+create policy "Everyone can view programme templates"
+  on public.programme_templates for select
+  to authenticated
+  using (true);
+
+create table if not exists public.programme_template_days (
+  id uuid primary key default gen_random_uuid(),
+  programme_template_id uuid not null references public.programme_templates (id) on delete cascade,
+  day_of_week public.day_of_week not null,
+  workout_template_id uuid not null references public.workout_templates (id),
+  unique (programme_template_id, day_of_week)
+);
+
+alter table public.programme_template_days enable row level security;
+
+drop policy if exists "Everyone can view programme template days" on public.programme_template_days;
+create policy "Everyone can view programme template days"
+  on public.programme_template_days for select
+  to authenticated
+  using (true);
+
+-- A client's actual, ongoing weekly schedule - one per client. Either built
+-- from scratch or by applying a programme_template, which copies its
+-- exercises in so they can be freely edited afterward without affecting the
+-- template or any other client using it.
+create table if not exists public.programmes (
+  id uuid primary key default gen_random_uuid(),
+  trainer_id uuid not null references public.profiles (id) on delete cascade,
+  client_id uuid not null references public.profiles (id) on delete cascade,
+  name text not null default 'Training programme',
+  created_at timestamptz not null default now(),
+  -- Scoped to (trainer_id, client_id) rather than just client_id, so this
+  -- doesn't rule out a client someday having more than one trainer.
+  unique (trainer_id, client_id)
+);
+
+alter table public.programmes enable row level security;
+
+drop policy if exists "Trainers can manage own client programmes" on public.programmes;
+create policy "Trainers can manage own client programmes"
+  on public.programmes for all
+  using (auth.uid() = trainer_id)
+  with check (auth.uid() = trainer_id);
+
+drop policy if exists "Clients can view own programme" on public.programmes;
+create policy "Clients can view own programme"
+  on public.programmes for select
+  using (auth.uid() = client_id);
+
+create table if not exists public.programme_days (
+  id uuid primary key default gen_random_uuid(),
+  programme_id uuid not null references public.programmes (id) on delete cascade,
+  day_of_week public.day_of_week not null,
+  name text,
+  is_rest boolean not null default true,
+  created_at timestamptz not null default now(),
+  unique (programme_id, day_of_week)
+);
+
+alter table public.programme_days enable row level security;
+
+drop policy if exists "Trainers can manage own client programme days" on public.programme_days;
+create policy "Trainers can manage own client programme days"
+  on public.programme_days for all
+  using (
+    exists (
+      select 1 from public.programmes
+      where programmes.id = programme_days.programme_id
+      and programmes.trainer_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.programmes
+      where programmes.id = programme_days.programme_id
+      and programmes.trainer_id = auth.uid()
+    )
+  );
+
+drop policy if exists "Clients can view own programme days" on public.programme_days;
+create policy "Clients can view own programme days"
+  on public.programme_days for select
+  using (
+    exists (
+      select 1 from public.programmes
+      where programmes.id = programme_days.programme_id
+      and programmes.client_id = auth.uid()
+    )
+  );
+
+create table if not exists public.programme_exercises (
+  id uuid primary key default gen_random_uuid(),
+  programme_day_id uuid not null references public.programme_days (id) on delete cascade,
+  exercise_id uuid references public.exercises (id),
+  custom_name text,
+  sets smallint not null,
+  reps text not null,
+  weight text,
+  notes text,
+  order_index smallint not null default 0,
+  check (exercise_id is not null or custom_name is not null)
+);
+
+alter table public.programme_exercises enable row level security;
+
+drop policy if exists "Trainers can manage own client programme exercises" on public.programme_exercises;
+create policy "Trainers can manage own client programme exercises"
+  on public.programme_exercises for all
+  using (
+    exists (
+      select 1 from public.programme_days
+      join public.programmes on programmes.id = programme_days.programme_id
+      where programme_days.id = programme_exercises.programme_day_id
+      and programmes.trainer_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.programme_days
+      join public.programmes on programmes.id = programme_days.programme_id
+      where programme_days.id = programme_exercises.programme_day_id
+      and programmes.trainer_id = auth.uid()
+    )
+  );
+
+drop policy if exists "Clients can view own programme exercises" on public.programme_exercises;
+create policy "Clients can view own programme exercises"
+  on public.programme_exercises for select
+  using (
+    exists (
+      select 1 from public.programme_days
+      join public.programmes on programmes.id = programme_days.programme_id
+      where programme_days.id = programme_exercises.programme_day_id
+      and programmes.client_id = auth.uid()
+    )
+  );

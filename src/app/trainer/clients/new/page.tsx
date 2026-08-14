@@ -5,8 +5,10 @@ import { inviteClient } from "@/app/trainer/clients/actions";
 import { Card } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
+import { CLIENT_GOAL_LABELS } from "@/lib/types";
 
 export default function NewClientPage() {
   const [state, action] = useActionState(inviteClient, undefined);
@@ -41,15 +43,56 @@ export default function NewClientPage() {
             />
           </Field>
 
+          <div className="grid grid-cols-2 gap-4">
+            <Field
+              label="Primary goal"
+              htmlFor="goal"
+              error={state?.errors?.goal?.[0]}
+            >
+              <Select id="goal" name="goal" defaultValue="">
+                <option value="" disabled>
+                  Choose one
+                </option>
+                {Object.entries(CLIENT_GOAL_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+
+            <Field
+              label="Days per week"
+              htmlFor="daysPerWeek"
+              error={state?.errors?.daysPerWeek?.[0]}
+            >
+              <Select id="daysPerWeek" name="daysPerWeek" defaultValue="">
+                <option value="" disabled>
+                  Choose one
+                </option>
+                {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                  <option key={n} value={n}>
+                    {n} {n === 1 ? "day" : "days"}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+
+          <p className="-mt-3 text-xs text-muted">
+            Used to suggest a starting workout programme - fully editable
+            afterward.
+          </p>
+
           <Field
-            label="Goals (optional)"
+            label="Goal details (optional)"
             htmlFor="goals"
             error={state?.errors?.goals?.[0]}
           >
             <Textarea
               id="goals"
               name="goals"
-              placeholder="e.g. Build strength, run a 5k..."
+              placeholder="e.g. Specifically wants to build a bigger squat"
             />
           </Field>
 

@@ -51,6 +51,14 @@ export const InviteClientSchema = z.object({
     .min(2, { error: "Please enter the client's full name." })
     .trim(),
   email: z.email({ error: "Please enter a valid email address." }).trim(),
+  goal: z.enum(["bodybuilding", "fat_loss", "general_fitness", "strength"], {
+    error: "Please choose a primary goal.",
+  }),
+  daysPerWeek: z.coerce
+    .number({ error: "Please choose how many days a week they can train." })
+    .int()
+    .min(1)
+    .max(7),
   goals: z.string().trim().optional(),
   notes: z.string().trim().optional(),
 });
@@ -60,6 +68,8 @@ export type InviteClientFormState =
       errors?: {
         fullName?: string[];
         email?: string[];
+        goal?: string[];
+        daysPerWeek?: string[];
         goals?: string[];
         notes?: string[];
       };
@@ -85,6 +95,48 @@ export type SetPasswordFormState =
         password?: string[];
         confirmPassword?: string[];
       };
+      message?: string;
+    }
+  | undefined;
+
+export const ProgrammeExerciseSchema = z.object({
+  exerciseName: z
+    .string()
+    .min(1, { error: "Please choose or type an exercise." })
+    .trim(),
+  sets: z.coerce
+    .number({ error: "Enter the number of sets." })
+    .int()
+    .min(1)
+    .max(20),
+  reps: z
+    .string()
+    .min(1, { error: "Enter reps, e.g. 8-10 or AMRAP." })
+    .trim(),
+  weight: z.string().trim().optional(),
+  notes: z.string().trim().optional(),
+});
+
+export type ProgrammeExerciseFormState =
+  | {
+      errors?: {
+        exerciseName?: string[];
+        sets?: string[];
+        reps?: string[];
+        weight?: string[];
+        notes?: string[];
+      };
+      message?: string;
+    }
+  | undefined;
+
+export const SimpleNameSchema = z.object({
+  name: z.string().min(2, { error: "Please enter a name." }).trim(),
+});
+
+export type SimpleNameFormState =
+  | {
+      errors?: { name?: string[] };
       message?: string;
     }
   | undefined;

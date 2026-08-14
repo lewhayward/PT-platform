@@ -6,8 +6,9 @@ progress tracking in one place.
 **Covers so far:**
 - **Phase 1**: account sign-up/login for both trainers and clients
 - **Phase 2**: trainers can invite clients by email, see their client list, and open a client's profile
+- **Phase 3**: trainers can build a client's weekly workout programme, with a built-in exercise library, suggested starter programmes, and easy re-use of workouts already built
 
-No workout, nutrition, or progress-tracking features yet - those come in later phases.
+No nutrition or progress-tracking features yet - those come in later phases.
 
 ## 1. Create your Supabase project
 
@@ -18,12 +19,15 @@ No workout, nutrition, or progress-tracking features yet - those come in later p
 ## 2. Set up the database
 
 1. In your Supabase project, open the **SQL Editor** tab.
-2. Open the file `supabase/schema.sql` in this project, copy its entire contents, and paste it into the SQL Editor.
-3. Click **Run**.
+2. Open the file `supabase/schema.sql` in this project, copy its entire contents, and paste it into the SQL Editor, then click **Run**.
+3. Do the same with `supabase/seed.sql` - paste its contents in and click **Run**. This loads the exercise library and starter workout programmes.
 
-This creates:
+`schema.sql` creates:
 - a `profiles` table that stores whether each person is a "trainer" or a "client" (with a profile row created automatically whenever someone signs up)
-- a `trainer_clients` table linking each trainer to the clients they've invited, with email, goals, notes, and a status (Invited / Active)
+- a `trainer_clients` table linking each trainer to the clients they've invited, with email, goals, notes, primary goal, days per week, and a status (Invited / Active)
+- `exercises`, `workout_templates`, `programme_templates` and related tables for Phase 3's workout programming
+
+Both files are safe to re-run any time (e.g. after pulling an update) - they won't duplicate data or wipe anything a trainer or client has already entered.
 
 ## 3. Add your environment variables
 
@@ -77,13 +81,29 @@ If all of that works, Phase 1 is solid.
 7. Click into that client from the list - you should see their profile page with the goals/notes you entered.
 8. **Check the guard**: while logged in as a different trainer (or logged out), try visiting another trainer's client profile URL directly - you should get a "not found" page, not their data.
 
-If all of that works, Phase 2 is solid and we can move on to Phase 3 (workout programming).
+If all of that works, Phase 2 is solid.
+
+## How to test Phase 3
+
+1. **Add a new client** (or use an existing one) - this time fill in **Primary goal** and **Days per week**, e.g. "Bodybuilding" and "3 days".
+2. From that client's profile, click **View programme**. If their goal/frequency matches one of the built-in starter programmes, you'll see it suggested - click **Use this programme**.
+   - You should land on a week view (Monday-Sunday), with the matching days already filled in with exercises and the rest marked as rest days.
+3. **Edit an exercise**: click **Edit** on any exercise, change the sets/reps/weight, and save - it should update just that one exercise.
+4. **Add an exercise**: on any day, click **+ Add exercise**, start typing in the exercise field - you should see suggestions from the library appear. Try typing something not in the list too (e.g. "Sled Push") and save - it should still save fine as a custom exercise.
+5. **The main "reuse" test**: on a day that already has exercises, click **Copy to other days...**, tick a couple of the rest days, and copy. Those days should now show the identical workout - no rebuilding by hand.
+6. **Save as template**: on a built day, click **Save as template**, give it a name. Then go to a *different* client's programme (or a rest day on the same one) and check that template appears in the "Use one of my templates..." dropdown at the bottom of a day card - selecting it and clicking Apply should fill that day in instantly.
+7. **Mark as rest day**: click it on a day with exercises - it should clear the exercises and show as a rest day again.
+8. **Check the client's view**: log in as that client (or open an incognito window) and check their dashboard shows today's actual assigned workout (or "Rest day" if today happens to be a rest day in their schedule).
+9. **Check the guard**: try building a programme for a client that isn't yours (a different trainer's client) by guessing a URL - you should get a "not found" page.
+
+If all of that works, Phase 3 is solid.
 
 ## Project structure
 
 - `src/app/` - pages and routes (Next.js App Router)
 - `src/app/auth/actions.ts` - sign-up, login, and logout logic
 - `src/app/trainer/clients/actions.ts` - inviting a client
+- `src/app/trainer/clients/[id]/programme/actions.ts` - building, editing, and reusing a client's workout programme
 - `src/app/invite/actions.ts` - a newly-invited client setting their password
 - `src/lib/supabase/server.ts` / `client.ts` - the regular Supabase clients (respect Row Level Security)
 - `src/lib/supabase/admin.ts` - the admin client (secret key, bypasses security rules) - only ever used server-side, only for inviting users
@@ -91,6 +111,7 @@ If all of that works, Phase 2 is solid and we can move on to Phase 3 (workout pr
 - `src/proxy.ts` - runs before every page request to keep sessions fresh and enforce redirects (Next.js 16 renamed "middleware" to "proxy")
 - `src/components/` - shared, reusable pieces of UI
 - `supabase/schema.sql` - the database setup script from step 2 above
+- `supabase/seed.sql` - the exercise library and starter workout programmes from step 2 above
 
 ## Branding
 

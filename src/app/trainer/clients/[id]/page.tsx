@@ -1,8 +1,11 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireProfile } from "@/lib/supabase/dal";
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badge";
+import { CLIENT_GOAL_LABELS, type ClientGoal } from "@/lib/types";
 
 export default async function ClientProfilePage(
   props: PageProps<"/trainer/clients/[id]">
@@ -15,7 +18,9 @@ export default async function ClientProfilePage(
   // signed-in trainer - a stranger's client ID just won't match any row.
   const { data: client } = await supabase
     .from("trainer_clients")
-    .select("id, client_id, email, goals, notes, status, created_at")
+    .select(
+      "id, client_id, email, goals, notes, goal, days_per_week, status, created_at"
+    )
     .eq("id", id)
     .single();
 
@@ -38,6 +43,16 @@ export default async function ClientProfilePage(
         <StatusBadge status={client.status} />
       </div>
       <p className="mt-1 text-sm text-muted">{client.email}</p>
+      {client.goal && client.days_per_week && (
+        <p className="mt-1 text-sm text-muted">
+          {CLIENT_GOAL_LABELS[client.goal as ClientGoal]} ·{" "}
+          {client.days_per_week} days/week
+        </p>
+      )}
+
+      <Link href={`/trainer/clients/${client.id}/programme`} className="mt-4 block">
+        <Button className="w-full sm:w-auto">View programme</Button>
+      </Link>
 
       <Card className="mt-6 flex flex-col gap-6">
         <div>

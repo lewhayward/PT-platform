@@ -28,6 +28,8 @@ export async function inviteClient(
   const validated = InviteClientSchema.safeParse({
     fullName: formData.get("fullName"),
     email: formData.get("email"),
+    goal: formData.get("goal"),
+    daysPerWeek: formData.get("daysPerWeek"),
     goals: formData.get("goals"),
     notes: formData.get("notes"),
   });
@@ -36,7 +38,7 @@ export async function inviteClient(
     return { errors: validated.error.flatten().fieldErrors };
   }
 
-  const { fullName, email, goals, notes } = validated.data;
+  const { fullName, email, goal, daysPerWeek, goals, notes } = validated.data;
   const siteUrl = await getSiteUrl();
 
   // Creates the client's account right away and emails them a link to set
@@ -59,6 +61,25 @@ export async function inviteClient(
 
   const supabase = await createClient();
 
+  // This must happen BEFORE set_invited_client_name below: that function
+  // only allows changing the name of someone who is actually this
+  // trainer's client, which it checks via this very row.
+  const { error: insertError } = await supabase
+    .from("trainer_clients")
+    .insert({
+      trainer_id: trainer.id,
+      client_id: data.user.id,
+      email,
+      goal,
+      days_per_week: daysPerWeek,
+      goals: goals || null,
+      notes: notes || null,
+    });
+
+  if (insertError) {
+    return { message: insertError.message };
+  }
+
   // The profiles.full_name trigger reads from auth.users at the moment it's
   // inserted, which isn't reliably populated yet for admin-created invites.
   // Set it explicitly via this narrow database function instead of trusting
@@ -73,20 +94,6 @@ export async function inviteClient(
     return {
       message: `Invite sent, but couldn't save their name: ${nameError.message}`,
     };
-  }
-
-  const { error: insertError } = await supabase
-    .from("trainer_clients")
-    .insert({
-      trainer_id: trainer.id,
-      client_id: data.user.id,
-      email,
-      goals: goals || null,
-      notes: notes || null,
-    });
-
-  if (insertError) {
-    return { message: insertError.message };
   }
 
   revalidatePath("/trainer");

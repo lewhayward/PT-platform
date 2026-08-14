@@ -11,6 +11,21 @@ export interface Profile {
 
 export type TrainerClientStatus = "invited" | "active";
 
+// Matches public.client_goal in supabase/schema.sql. Used to suggest a
+// starting programme template for a client (see programme_templates).
+export type ClientGoal =
+  | "bodybuilding"
+  | "fat_loss"
+  | "general_fitness"
+  | "strength";
+
+export const CLIENT_GOAL_LABELS: Record<ClientGoal, string> = {
+  bodybuilding: "Bodybuilding",
+  fat_loss: "Fat loss",
+  general_fitness: "General fitness",
+  strength: "Strength",
+};
+
 export interface TrainerClient {
   id: string;
   trainer_id: string;
@@ -18,6 +33,95 @@ export interface TrainerClient {
   email: string;
   goals: string | null;
   notes: string | null;
+  goal: ClientGoal | null;
+  days_per_week: number | null;
   status: TrainerClientStatus;
   created_at: string;
+}
+
+// Matches public.day_of_week in supabase/schema.sql.
+export type DayOfWeek = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+
+export const DAYS_OF_WEEK: DayOfWeek[] = [
+  "mon",
+  "tue",
+  "wed",
+  "thu",
+  "fri",
+  "sat",
+  "sun",
+];
+
+export const DAY_LABELS: Record<DayOfWeek, string> = {
+  mon: "Monday",
+  tue: "Tuesday",
+  wed: "Wednesday",
+  thu: "Thursday",
+  fri: "Friday",
+  sat: "Saturday",
+  sun: "Sunday",
+};
+
+export type MuscleGroup =
+  | "chest"
+  | "back"
+  | "shoulders"
+  | "arms"
+  | "legs"
+  | "core"
+  | "cardio"
+  | "full_body";
+
+export const MUSCLE_GROUP_LABELS: Record<MuscleGroup, string> = {
+  chest: "Chest",
+  back: "Back",
+  shoulders: "Shoulders",
+  arms: "Arms",
+  legs: "Legs",
+  core: "Core",
+  cardio: "Cardio",
+  full_body: "Full body",
+};
+
+export interface Exercise {
+  id: string;
+  name: string;
+  muscle_group: MuscleGroup;
+  equipment: string | null;
+}
+
+export interface ProgrammeExercise {
+  id: string;
+  programme_day_id: string;
+  exercise_id: string | null;
+  custom_name: string | null;
+  sets: number;
+  reps: string;
+  weight: string | null;
+  notes: string | null;
+  order_index: number;
+  exercise?: Exercise | null;
+}
+
+export interface ProgrammeDay {
+  id: string;
+  programme_id: string;
+  day_of_week: DayOfWeek;
+  name: string | null;
+  is_rest: boolean;
+}
+
+export interface Programme {
+  id: string;
+  trainer_id: string;
+  client_id: string;
+  name: string;
+}
+
+export interface ProgrammeTemplate {
+  id: string;
+  name: string;
+  goal: ClientGoal;
+  days_per_week: number;
+  description: string | null;
 }
