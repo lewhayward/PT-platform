@@ -64,10 +64,16 @@ export async function inviteClient(
   // Set it explicitly via this narrow database function instead of trusting
   // that timing (a trainer's own session isn't otherwise allowed to edit
   // someone else's profile - see set_invited_client_name in schema.sql).
-  await supabase.rpc("set_invited_client_name", {
+  const { error: nameError } = await supabase.rpc("set_invited_client_name", {
     target_client_id: data.user.id,
     new_full_name: fullName,
   });
+
+  if (nameError) {
+    return {
+      message: `Invite sent, but couldn't save their name: ${nameError.message}`,
+    };
+  }
 
   const { error: insertError } = await supabase
     .from("trainer_clients")
