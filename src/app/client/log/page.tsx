@@ -12,6 +12,7 @@ export default async function LogWorkoutPage() {
     .from("programmes")
     .select("id")
     .eq("client_id", profile.id)
+    .limit(1)
     .maybeSingle();
 
   if (!programme) {
@@ -64,8 +65,9 @@ export default async function LogWorkoutPage() {
   const { data: existingLogExercises } = existingLog
     ? await supabase
         .from("workout_log_exercises")
-        .select("id, exercise_id, custom_name")
+        .select("id, exercise_id, custom_name, order_index")
         .eq("workout_log_id", existingLog.id)
+        .order("order_index")
     : { data: [] };
 
   const logExerciseIds = (existingLogExercises ?? []).map((le) => le.id);
@@ -86,17 +88,34 @@ export default async function LogWorkoutPage() {
 
   // Match previous log entries back to today's prescribed exercises by
   // exercise identity (id or custom name) - the programme may have been
-  // edited since, so positions alone can't be trusted.
-  const previousSetsByExercise = new Map(
-    (existingLogExercises ?? []).map((le) => [
-      le.exercise_id ?? le.custom_name,
-      setsByLogExerciseId.get(le.id) ?? [],
-    ])
-  );
+  // edited since, so positions alone can't be trusted. Also tracks WHICH
+  // occurrence of a repeated exercise (e.g. the same lift prescribed twice
+  // in one day) each entry was, so duplicates don't all collapse onto the
+  // last one.
+  function occurrenceKey(identity: string, occurrence: number) {
+    return `${identity}::${occurrence}`;
+  }
 
+  const previousSetsByOccurrence = new Map<string, typeof existingSets>();
+  const previousOccurrenceCounts = new Map<string, number>();
+  for (const le of existingLogExercises ?? []) {
+    const identity = le.exercise_id ?? le.custom_name ?? "";
+    const occurrence = previousOccurrenceCounts.get(identity) ?? 0;
+    previousOccurrenceCounts.set(identity, occurrence + 1);
+    previousSetsByOccurrence.set(
+      occurrenceKey(identity, occurrence),
+      setsByLogExerciseId.get(le.id) ?? []
+    );
+  }
+
+  const occurrenceCounts = new Map<string, number>();
   const formExercises = exercises.map((exercise) => {
-    const key = exercise.exercise_id ?? exercise.custom_name;
-    const previousSets = previousSetsByExercise.get(key) ?? [];
+    const identity = exercise.exercise_id ?? exercise.custom_name ?? "";
+    const occurrence = occurrenceCounts.get(identity) ?? 0;
+    occurrenceCounts.set(identity, occurrence + 1);
+    const previousSets =
+      previousSetsByOccurrence.get(occurrenceKey(identity, occurrence)) ?? [];
+
     return {
       id: exercise.id,
       name: exercise.exercise_id

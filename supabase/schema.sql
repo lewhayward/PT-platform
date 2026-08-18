@@ -473,7 +473,11 @@ create policy "Clients can view own programme exercises"
 -- the moment the client logs the workout.
 create table if not exists public.workout_logs (
   id uuid primary key default gen_random_uuid(),
-  programme_day_id uuid not null references public.programme_days (id) on delete cascade,
+  -- Nullable + "set null" (not "cascade"): if a programme day is ever
+  -- deleted, the log itself should survive as history - only the live
+  -- link back to it goes away. Nothing deletes programme_days today, but
+  -- the snapshot design (see comment below) is meant to hold even then.
+  programme_day_id uuid references public.programme_days (id) on delete set null,
   client_id uuid not null references public.profiles (id) on delete cascade,
   day_name text,
   logged_date date not null default current_date,
@@ -486,11 +490,27 @@ create table if not exists public.workout_logs (
 
 alter table public.workout_logs enable row level security;
 
+-- Constrains client_id AND requires programme_day_id to actually be one of
+-- the caller's own programme's days. The anon key is public and RLS is the
+-- real security boundary here (not just the app code) - without this,
+-- client A could insert a log row pointing at client B's programme_day_id,
+-- taking the (programme_day_id, logged_date) slot B needs for their own log.
 drop policy if exists "Clients can manage own workout logs" on public.workout_logs;
 create policy "Clients can manage own workout logs"
   on public.workout_logs for all
   using (auth.uid() = client_id)
-  with check (auth.uid() = client_id);
+  with check (
+    auth.uid() = client_id
+    and (
+      programme_day_id is null
+      or exists (
+        select 1 from public.programme_days
+        join public.programmes on programmes.id = programme_days.programme_id
+        where programme_days.id = workout_logs.programme_day_id
+        and programmes.client_id = auth.uid()
+      )
+    )
+  );
 
 drop policy if exists "Trainers can view their clients' workout logs" on public.workout_logs;
 create policy "Trainers can view their clients' workout logs"
@@ -513,7 +533,11 @@ create table if not exists public.workout_log_exercises (
   prescribed_reps text,
   prescribed_weight text,
   order_index smallint not null default 0,
-  check (exercise_id is not null or custom_name is not null)
+  check (exercise_id is not null or custom_name is not null),
+  -- Guards against a double-submit (e.g. two tabs) interleaving with the
+  -- delete-then-reinsert re-log flow and duplicating an exercise - turns a
+  -- silent race into a clear error instead.
+  unique (workout_log_id, order_index)
 );
 
 alter table public.workout_log_exercises enable row level security;

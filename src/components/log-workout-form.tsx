@@ -1,5 +1,6 @@
 "use client";
 
+import { useActionState } from "react";
 import { logWorkout } from "@/app/client/log/actions";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,8 +30,10 @@ export function LogWorkoutForm({
   exercises: FormExercise[];
   defaultNotes: string;
 }) {
+  const [state, action] = useActionState(logWorkout, undefined);
+
   return (
-    <form action={logWorkout} className="mt-6 flex flex-col gap-4">
+    <form action={action} className="mt-6 flex flex-col gap-4">
       {exercises.map((exercise) => (
         <Card key={exercise.id}>
           <p className="font-medium text-foreground">{exercise.name}</p>
@@ -52,6 +55,7 @@ export function LogWorkoutForm({
                 <Input
                   type="number"
                   min={0}
+                  max={999}
                   name={`reps-${exercise.id}-${set.setNumber}`}
                   defaultValue={set.reps ?? undefined}
                   placeholder="Reps"
@@ -79,6 +83,8 @@ export function LogWorkoutForm({
           />
         </Field>
       </Card>
+
+      {state?.message && <p className="text-sm text-danger">{state.message}</p>}
 
       <SubmitButton pendingLabel="Saving…" className="w-full">
         Save log

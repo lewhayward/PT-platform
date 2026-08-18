@@ -140,3 +140,14 @@ export type SimpleNameFormState =
       message?: string;
     }
   | undefined;
+
+// Bounds a single logged set's reps to something a person could plausibly
+// do. Checked BEFORE the log-workout action deletes any existing entry, so
+// a stray typo can't wipe out a client's real logged data.
+export const WorkoutLogRepsSchema = z.coerce
+  .number({ error: "Reps must be a number." })
+  .int({ error: "Reps must be a whole number." })
+  .min(0, { error: "Reps can't be negative." })
+  .max(999, { error: "That doesn't look right - reps must be 999 or under." });
+
+export type LogWorkoutFormState = { message?: string } | undefined;

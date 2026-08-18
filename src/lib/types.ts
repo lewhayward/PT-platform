@@ -62,7 +62,10 @@ export const DAY_LABELS: Record<DayOfWeek, string> = {
   sun: "Sunday",
 };
 
-// getDay() returns 0 (Sunday) through 6 (Saturday).
+// getUTCDay() returns 0 (Sunday) through 6 (Saturday). Deliberately UTC,
+// not local server time: `logged_date` elsewhere is derived from
+// toISOString() (always UTC), and this must agree with that or a workout
+// logged near midnight could be stamped with the wrong day.
 const JS_DAY_TO_ENUM: DayOfWeek[] = [
   "sun",
   "mon",
@@ -74,7 +77,7 @@ const JS_DAY_TO_ENUM: DayOfWeek[] = [
 ];
 
 export function getTodayDayOfWeek(): DayOfWeek {
-  return JS_DAY_TO_ENUM[new Date().getDay()];
+  return JS_DAY_TO_ENUM[new Date().getUTCDay()];
 }
 
 export type MuscleGroup =

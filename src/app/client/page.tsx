@@ -13,6 +13,7 @@ export default async function ClientDashboardPage() {
     .from("programmes")
     .select("id")
     .eq("client_id", profile.id)
+    .limit(1)
     .maybeSingle();
 
   if (!programme) {

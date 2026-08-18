@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 export default async function WorkoutHistoryPage(
   props: PageProps<"/trainer/clients/[id]/history">
 ) {
-  await requireProfile("trainer");
+  const trainer = await requireProfile("trainer");
   const { id: trainerClientId } = await props.params;
   const supabase = await createClient();
 
@@ -29,12 +29,36 @@ export default async function WorkoutHistoryPage(
 
   const clientName = profile?.full_name ?? client.email;
 
-  const { data: logs } = await supabase
-    .from("workout_logs")
-    .select("id, day_name, logged_date, notes")
+  // Scoped through this trainer's own programme for this client, rather
+  // than a bare client_id filter - that's the exact boundary the RLS
+  // policy on workout_logs checks (it grants by programme ownership, not
+  // by client_id alone), so this keeps the query and the policy in
+  // agreement instead of one silently filtering out what the other allows.
+  const { data: programme } = await supabase
+    .from("programmes")
+    .select("id")
     .eq("client_id", client.client_id)
-    .order("logged_date", { ascending: false })
-    .limit(30);
+    .eq("trainer_id", trainer.id)
+    .maybeSingle();
+
+  const { data: days } = programme
+    ? await supabase
+        .from("programme_days")
+        .select("id")
+        .eq("programme_id", programme.id)
+    : { data: [] };
+
+  const dayIds = days?.map((d) => d.id) ?? [];
+
+  const { data: logs } =
+    dayIds.length > 0
+      ? await supabase
+          .from("workout_logs")
+          .select("id, day_name, logged_date, notes")
+          .in("programme_day_id", dayIds)
+          .order("logged_date", { ascending: false })
+          .limit(30)
+      : { data: [] };
 
   const logIds = logs?.map((l) => l.id) ?? [];
 
