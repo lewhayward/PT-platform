@@ -62,6 +62,21 @@ export const DAY_LABELS: Record<DayOfWeek, string> = {
   sun: "Sunday",
 };
 
+// getDay() returns 0 (Sunday) through 6 (Saturday).
+const JS_DAY_TO_ENUM: DayOfWeek[] = [
+  "sun",
+  "mon",
+  "tue",
+  "wed",
+  "thu",
+  "fri",
+  "sat",
+];
+
+export function getTodayDayOfWeek(): DayOfWeek {
+  return JS_DAY_TO_ENUM[new Date().getDay()];
+}
+
 export type MuscleGroup =
   | "chest"
   | "back"
@@ -124,4 +139,34 @@ export interface ProgrammeTemplate {
   goal: ClientGoal;
   days_per_week: number;
   description: string | null;
+}
+
+export interface WorkoutLogSet {
+  id: string;
+  workout_log_exercise_id: string;
+  set_number: number;
+  reps_completed: number | null;
+  weight_used: string | null;
+}
+
+export interface WorkoutLogExercise {
+  id: string;
+  workout_log_id: string;
+  exercise_id: string | null;
+  custom_name: string | null;
+  prescribed_sets: number | null;
+  prescribed_reps: string | null;
+  prescribed_weight: string | null;
+  order_index: number;
+  exercise?: Exercise | null;
+  sets: WorkoutLogSet[];
+}
+
+export interface WorkoutLog {
+  id: string;
+  programme_day_id: string;
+  client_id: string;
+  day_name: string | null;
+  logged_date: string;
+  notes: string | null;
 }

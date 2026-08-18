@@ -1,18 +1,9 @@
+import Link from "next/link";
 import { requireProfile } from "@/lib/supabase/dal";
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/card";
-import { DAY_LABELS, type DayOfWeek } from "@/lib/types";
-
-// getDay() returns 0 (Sunday) through 6 (Saturday).
-const JS_DAY_TO_ENUM: DayOfWeek[] = [
-  "sun",
-  "mon",
-  "tue",
-  "wed",
-  "thu",
-  "fri",
-  "sat",
-];
+import { Button } from "@/components/ui/button";
+import { DAY_LABELS, getTodayDayOfWeek } from "@/lib/types";
 
 export default async function ClientDashboardPage() {
   const profile = await requireProfile("client");
@@ -37,7 +28,7 @@ export default async function ClientDashboardPage() {
     );
   }
 
-  const today = JS_DAY_TO_ENUM[new Date().getDay()];
+  const today = getTodayDayOfWeek();
 
   const { data: day } = await supabase
     .from("programme_days")
@@ -66,13 +57,25 @@ export default async function ClientDashboardPage() {
       : { data: [] };
   const nameById = new Map(libraryExercises?.map((e) => [e.id, e.name]));
 
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const { data: log } = day
+    ? await supabase
+        .from("workout_logs")
+        .select("id")
+        .eq("programme_day_id", day.id)
+        .eq("logged_date", todayIso)
+        .maybeSingle()
+    : { data: null };
+
+  const hasWorkout = day && !day.is_rest && exercises && exercises.length > 0;
+
   return (
     <div className="mx-auto max-w-2xl">
       <h2 className="text-xl font-semibold text-foreground">
         Today - {DAY_LABELS[today]}
       </h2>
 
-      {!day || day.is_rest || !exercises || exercises.length === 0 ? (
+      {!hasWorkout ? (
         <Card className="mt-6 text-center">
           <p className="text-muted">
             {day && !day.is_rest
@@ -82,9 +85,7 @@ export default async function ClientDashboardPage() {
         </Card>
       ) : (
         <>
-          {day.name && (
-            <p className="mt-1 text-sm text-muted">{day.name}</p>
-          )}
+          {day.name && <p className="mt-1 text-sm text-muted">{day.name}</p>}
           <div className="mt-6 flex flex-col gap-3">
             {exercises.map((exercise) => (
               <Card key={exercise.id}>
@@ -102,6 +103,23 @@ export default async function ClientDashboardPage() {
                 )}
               </Card>
             ))}
+          </div>
+
+          <div className="mt-6">
+            {log ? (
+              <Card className="flex items-center justify-between gap-4">
+                <p className="font-medium text-accent">
+                  ✓ Logged for today
+                </p>
+                <Link href="/client/log">
+                  <Button variant="secondary">Edit log</Button>
+                </Link>
+              </Card>
+            ) : (
+              <Link href="/client/log">
+                <Button className="w-full">Log this workout</Button>
+              </Link>
+            )}
           </div>
         </>
       )}

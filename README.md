@@ -7,6 +7,7 @@ progress tracking in one place.
 - **Phase 1**: account sign-up/login for both trainers and clients
 - **Phase 2**: trainers can invite clients by email, see their client list, and open a client's profile
 - **Phase 3**: trainers can build a client's weekly workout programme, with a built-in exercise library, suggested starter programmes, and easy re-use of workouts already built
+- **Phase 4**: clients log what they actually did (reps/weight per set) against their assigned workout, and trainers can see completed vs. assigned per client
 
 No nutrition or progress-tracking features yet - those come in later phases.
 
@@ -26,6 +27,7 @@ No nutrition or progress-tracking features yet - those come in later phases.
 - a `profiles` table that stores whether each person is a "trainer" or a "client" (with a profile row created automatically whenever someone signs up)
 - a `trainer_clients` table linking each trainer to the clients they've invited, with email, goals, notes, primary goal, days per week, and a status (Invited / Active)
 - `exercises`, `workout_templates`, `programme_templates` and related tables for Phase 3's workout programming
+- `workout_logs` and related tables for Phase 4's workout logging
 
 Both files are safe to re-run any time (e.g. after pulling an update) - they won't duplicate data or wipe anything a trainer or client has already entered.
 
@@ -98,12 +100,23 @@ If all of that works, Phase 2 is solid.
 
 If all of that works, Phase 3 is solid.
 
+## How to test Phase 4
+
+1. **Log in as a client** with an assigned workout today, and click **Log this workout** on the dashboard.
+2. You'll see each exercise with a row per prescribed set, pre-filled with the prescribed reps/weight. Change a couple of numbers to simulate doing something slightly different, add a note, and **Save log**.
+3. Back on the dashboard, you should see **"✓ Logged for today"** instead of the log button. Click **Edit log** - your changes should still be there.
+4. **Log in as that client's trainer**, open the client's profile, and click **Workout history**. You should see today's entry showing what was prescribed vs. what was actually completed for each exercise.
+5. **Check the guard**: while logged in as a different trainer, try visiting another trainer's client's history page directly via URL - you should get a "not found" page.
+
+If all of that works, Phase 4 is solid.
+
 ## Project structure
 
 - `src/app/` - pages and routes (Next.js App Router)
 - `src/app/auth/actions.ts` - sign-up, login, and logout logic
 - `src/app/trainer/clients/actions.ts` - inviting a client
 - `src/app/trainer/clients/[id]/programme/actions.ts` - building, editing, and reusing a client's workout programme
+- `src/app/client/log/actions.ts` - a client logging what they actually did against today's plan
 - `src/app/invite/actions.ts` - a newly-invited client setting their password
 - `src/lib/supabase/server.ts` / `client.ts` - the regular Supabase clients (respect Row Level Security)
 - `src/lib/supabase/admin.ts` - the admin client (secret key, bypasses security rules) - only ever used server-side, only for inviting users

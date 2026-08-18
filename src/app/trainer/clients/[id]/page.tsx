@@ -50,9 +50,16 @@ export default async function ClientProfilePage(
         </p>
       )}
 
-      <Link href={`/trainer/clients/${client.id}/programme`} className="mt-4 block">
-        <Button className="w-full sm:w-auto">View programme</Button>
-      </Link>
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+        <Link href={`/trainer/clients/${client.id}/programme`}>
+          <Button className="w-full sm:w-auto">View programme</Button>
+        </Link>
+        <Link href={`/trainer/clients/${client.id}/history`}>
+          <Button variant="secondary" className="w-full sm:w-auto">
+            Workout history
+          </Button>
+        </Link>
+      </div>
 
       <Card className="mt-6 flex flex-col gap-6">
         <div>

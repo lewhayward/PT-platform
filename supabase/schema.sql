@@ -461,3 +461,135 @@ create policy "Clients can view own programme exercises"
       and programmes.client_id = auth.uid()
     )
   );
+
+-- ============================================================================
+-- Phase 4 - workout logging
+-- ============================================================================
+
+-- A record of one completed session. Deliberately does NOT lean on
+-- programme_days/programme_exercises staying put - a trainer editing next
+-- week's plan shouldn't be able to silently rewrite what a log says
+-- happened last month. day_name/prescribed_* below are a snapshot taken at
+-- the moment the client logs the workout.
+create table if not exists public.workout_logs (
+  id uuid primary key default gen_random_uuid(),
+  programme_day_id uuid not null references public.programme_days (id) on delete cascade,
+  client_id uuid not null references public.profiles (id) on delete cascade,
+  day_name text,
+  logged_date date not null default current_date,
+  notes text,
+  created_at timestamptz not null default now(),
+  -- One log per day-slot per calendar date - logging the same day twice in
+  -- one day updates the existing entry rather than creating a duplicate.
+  unique (programme_day_id, logged_date)
+);
+
+alter table public.workout_logs enable row level security;
+
+drop policy if exists "Clients can manage own workout logs" on public.workout_logs;
+create policy "Clients can manage own workout logs"
+  on public.workout_logs for all
+  using (auth.uid() = client_id)
+  with check (auth.uid() = client_id);
+
+drop policy if exists "Trainers can view their clients' workout logs" on public.workout_logs;
+create policy "Trainers can view their clients' workout logs"
+  on public.workout_logs for select
+  using (
+    exists (
+      select 1 from public.programme_days
+      join public.programmes on programmes.id = programme_days.programme_id
+      where programme_days.id = workout_logs.programme_day_id
+      and programmes.trainer_id = auth.uid()
+    )
+  );
+
+create table if not exists public.workout_log_exercises (
+  id uuid primary key default gen_random_uuid(),
+  workout_log_id uuid not null references public.workout_logs (id) on delete cascade,
+  exercise_id uuid references public.exercises (id),
+  custom_name text,
+  prescribed_sets smallint,
+  prescribed_reps text,
+  prescribed_weight text,
+  order_index smallint not null default 0,
+  check (exercise_id is not null or custom_name is not null)
+);
+
+alter table public.workout_log_exercises enable row level security;
+
+drop policy if exists "Clients can manage own workout log exercises" on public.workout_log_exercises;
+create policy "Clients can manage own workout log exercises"
+  on public.workout_log_exercises for all
+  using (
+    exists (
+      select 1 from public.workout_logs
+      where workout_logs.id = workout_log_exercises.workout_log_id
+      and workout_logs.client_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.workout_logs
+      where workout_logs.id = workout_log_exercises.workout_log_id
+      and workout_logs.client_id = auth.uid()
+    )
+  );
+
+drop policy if exists "Trainers can view their clients' workout log exercises" on public.workout_log_exercises;
+create policy "Trainers can view their clients' workout log exercises"
+  on public.workout_log_exercises for select
+  using (
+    exists (
+      select 1 from public.workout_logs
+      join public.programme_days on programme_days.id = workout_logs.programme_day_id
+      join public.programmes on programmes.id = programme_days.programme_id
+      where workout_logs.id = workout_log_exercises.workout_log_id
+      and programmes.trainer_id = auth.uid()
+    )
+  );
+
+create table if not exists public.workout_log_sets (
+  id uuid primary key default gen_random_uuid(),
+  workout_log_exercise_id uuid not null references public.workout_log_exercises (id) on delete cascade,
+  set_number smallint not null,
+  reps_completed smallint,
+  weight_used text,
+  unique (workout_log_exercise_id, set_number)
+);
+
+alter table public.workout_log_sets enable row level security;
+
+drop policy if exists "Clients can manage own workout log sets" on public.workout_log_sets;
+create policy "Clients can manage own workout log sets"
+  on public.workout_log_sets for all
+  using (
+    exists (
+      select 1 from public.workout_log_exercises
+      join public.workout_logs on workout_logs.id = workout_log_exercises.workout_log_id
+      where workout_log_exercises.id = workout_log_sets.workout_log_exercise_id
+      and workout_logs.client_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.workout_log_exercises
+      join public.workout_logs on workout_logs.id = workout_log_exercises.workout_log_id
+      where workout_log_exercises.id = workout_log_sets.workout_log_exercise_id
+      and workout_logs.client_id = auth.uid()
+    )
+  );
+
+drop policy if exists "Trainers can view their clients' workout log sets" on public.workout_log_sets;
+create policy "Trainers can view their clients' workout log sets"
+  on public.workout_log_sets for select
+  using (
+    exists (
+      select 1 from public.workout_log_exercises
+      join public.workout_logs on workout_logs.id = workout_log_exercises.workout_log_id
+      join public.programme_days on programme_days.id = workout_logs.programme_day_id
+      join public.programmes on programmes.id = programme_days.programme_id
+      where workout_log_exercises.id = workout_log_sets.workout_log_exercise_id
+      and programmes.trainer_id = auth.uid()
+    )
+  );
