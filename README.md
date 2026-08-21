@@ -149,10 +149,18 @@ If all of that works, Phase 5 is solid.
 
 ## Branding
 
-The colour palette (a calm sage green) and the app icons in `public/` are
-placeholders. Swap `public/icon-192.png`, `public/icon-512.png`,
-`public/apple-icon.png`, and the colours in `src/app/globals.css` and
-`src/app/manifest.ts` for your own whenever you're ready.
+The app uses a fixed "Midnight & Gold" dark theme - deep charcoal
+backgrounds, a warm gold accent, and an elegant serif for headings
+(`src/app/globals.css` and `src/app/layout.tsx`) - rather than adapting to
+a visitor's system light/dark preference, so the premium feel stays
+consistent for everyone.
+
+The app icons in `public/` are still generic placeholders (they weren't
+part of this pass, since generating new image assets isn't something this
+tool can do). Swap `public/icon-192.png`, `public/icon-512.png`, and
+`public/apple-icon.png` for your own logo whenever you're ready - the
+colours around them (in `globals.css` and `src/app/manifest.ts`) already
+match the new theme.
 
 ## Tech stack
 

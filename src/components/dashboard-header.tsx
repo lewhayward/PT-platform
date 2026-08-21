@@ -12,10 +12,12 @@ export function DashboardHeader({
   roleLabel: string;
 }) {
   return (
-    <header className="flex items-center justify-between border-b border-border px-4 py-4 sm:px-8">
+    <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/80 px-4 py-4 backdrop-blur-md sm:px-8">
       <div>
-        <p className="text-sm text-muted">{roleLabel}</p>
-        <p className="font-medium text-foreground">
+        <p className="text-xs font-medium uppercase tracking-wider text-accent">
+          {roleLabel}
+        </p>
+        <p className="font-serif text-lg text-foreground">
           {fullName ?? "Welcome"}
         </p>
       </div>

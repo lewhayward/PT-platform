@@ -29,7 +29,10 @@ function FieldLabel({
 }: LabelHTMLAttributes<HTMLLabelElement>) {
   return (
     <label
-      className={cn("text-sm font-medium text-foreground", className)}
+      className={cn(
+        "text-xs font-medium uppercase tracking-wider text-muted",
+        className
+      )}
       {...props}
     />
   );

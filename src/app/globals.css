@@ -1,45 +1,35 @@
 @import "tailwindcss";
 
 /*
-  Calm, premium colour palette for the PT platform.
-  Warm off-white surfaces, soft sage-green accent (not a loud "gym" red),
-  muted text tones. Each variable has a light and dark value below.
+  "Midnight & Gold" - a fixed, luxury dark theme (not adapted per system
+  light/dark preference - a private-members'-club feel doesn't work if it
+  flips to pale cream on a light-mode device, so this is deliberately the
+  only theme).
+
+  Deep warm charcoal surfaces, an antique-gold accent, warm ivory text.
 */
 :root {
-  --background: #faf9f7;
-  --surface: #ffffff;
-  --foreground: #1c1c1a;
-  --muted: #6b6b65;
-  --border: #e4e2dd;
+  --background: #0e0d0c;
+  --surface: #17150f;
+  --surface-raised: #1e1b14;
+  --foreground: #f3ecdf;
+  --muted: #a89f8d;
+  --border: #2e2a20;
 
-  --accent: #4b6455;
-  --accent-hover: #3e5347;
-  --accent-foreground: #ffffff;
+  --accent: #c9a24d;
+  --accent-hover: #ddb968;
+  --accent-foreground: #1c1408;
 
-  --danger: #b3413d;
-  --danger-foreground: #ffffff;
-}
+  --danger: #c1655a;
+  --danger-foreground: #241009;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #121210;
-    --surface: #1a1a17;
-    --foreground: #f2f1ed;
-    --muted: #9c9b94;
-    --border: #2e2e29;
-
-    --accent: #7fa08c;
-    --accent-hover: #93b3a0;
-    --accent-foreground: #10231a;
-
-    --danger: #d97874;
-    --danger-foreground: #2a0d0b;
-  }
+  --shadow-color: 0 0% 0%;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-border: var(--border);
@@ -50,9 +40,93 @@
   --color-danger-foreground: var(--danger-foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-display);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+/* A faint warm radial glow, fixed to the viewport rather than the page, so
+   long pages don't just fade to flat black at the bottom - the kind of
+   quiet detail that reads as "considered" rather than "default". */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 40% at 50% -10%, rgba(201, 162, 77, 0.10), transparent 60%),
+    radial-gradient(ellipse 50% 30% at 100% 100%, rgba(201, 162, 77, 0.05), transparent 60%);
+}
+
+@layer base {
+  h1, h2, h3 {
+    font-family: var(--font-serif), var(--font-sans), serif;
+    letter-spacing: -0.01em;
+  }
+
+  ::selection {
+    background: rgba(201, 162, 77, 0.35);
+    color: var(--foreground);
+  }
+
+  /* A gold-flecked scrollbar reads better against near-black than the
+     browser default light-grey one. Webkit-only is fine here - it's a
+     cosmetic nicety, not something the app depends on. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--background);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted);
+  }
+}
+
+/* Page-enter animation, played by PageTransition on every route change.
+   Kept short and subtle - this should read as "polished", not "flashy". */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-page-enter {
+  animation: page-enter 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes gold-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: gold-fade-in 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-page-enter,
+  .animate-fade-in {
+    animation: none;
+  }
 }

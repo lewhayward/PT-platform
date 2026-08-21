@@ -5,15 +5,18 @@ import { Button } from "@/components/ui/button";
 // their dashboard. This is just the gateway for signed-out visitors.
 export default function Home() {
   return (
-    <div className="flex min-h-screen flex-1 flex-col items-center justify-center px-4 text-center">
-      <h1 className="max-w-md text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-        Everything for your clients, in one calm place.
+    <div className="flex min-h-screen flex-1 flex-col items-center justify-center px-4 text-center animate-fade-in">
+      <p className="text-xs font-medium uppercase tracking-[0.2em] text-accent">
+        PT Platform
+      </p>
+      <h1 className="mt-4 max-w-md text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
+        Everything for your clients, in one refined place.
       </h1>
       <p className="mt-4 max-w-sm text-muted">
         Workouts, nutrition and progress tracking - built for personal
         trainers and their clients.
       </p>
-      <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+      <div className="mt-10 flex flex-col gap-3 sm:flex-row">
         <Link href="/signup">
           <Button className="w-full sm:w-auto">Get started</Button>
         </Link>
