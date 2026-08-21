@@ -9,18 +9,24 @@ import {
   type NutritionTargetsFormState,
 } from "@/lib/definitions";
 
-// Loads the trainer_clients row for this URL's :id, scoped to the
-// signed-in trainer by Row Level Security - a stranger's client id just
-// won't match any row.
+// Loads the trainer_clients row for this URL's :id. RLS alone isn't a tight
+// enough check here - trainer_clients has a SEPARATE select policy letting
+// the client themselves see their own row too, so an explicit trainer_id
+// filter is needed to actually assert "this is one of MY clients" rather
+// than just "this row is visible to me".
 async function getOwnedClient(trainerClientId: string) {
   const trainer = await requireProfile("trainer");
   const supabase = await createClient();
-  const { data: client } = await supabase
+  const { data: client, error } = await supabase
     .from("trainer_clients")
     .select("id, client_id")
     .eq("id", trainerClientId)
-    .single();
+    .eq("trainer_id", trainer.id)
+    .maybeSingle();
 
+  if (error) {
+    throw new Error(error.message);
+  }
   if (!client) {
     throw new Error("Client not found");
   }

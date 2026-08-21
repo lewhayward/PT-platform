@@ -117,10 +117,29 @@ create policy "Trainers can view own clients"
   on public.trainer_clients for select
   using (auth.uid() = trainer_id);
 
+-- Requires the caller to actually be a trainer, not just anyone signed in -
+-- without the role check, any authenticated user could insert a row naming
+-- themselves as trainer_id and any other profile as client_id, gaining read
+-- access to that person's data wherever a policy trusts this table (e.g.
+-- food_logs and nutrition_targets below).
 drop policy if exists "Trainers can add own clients" on public.trainer_clients;
 create policy "Trainers can add own clients"
   on public.trainer_clients for insert
-  with check (auth.uid() = trainer_id);
+  with check (
+    auth.uid() = trainer_id
+    and exists (
+      select 1 from public.profiles
+      where profiles.id = auth.uid() and profiles.role = 'trainer'
+    )
+    -- Also requires the named client_id to actually be a client-role
+    -- profile - otherwise one trainer could name a second trainer as their
+    -- "client", and that second trainer's own client-view policy on this
+    -- table would then let them see the (fabricated) relationship row.
+    and exists (
+      select 1 from public.profiles
+      where profiles.id = trainer_clients.client_id and profiles.role = 'client'
+    )
+  );
 
 drop policy if exists "Trainers can update own clients" on public.trainer_clients;
 create policy "Trainers can update own clients"
@@ -641,12 +660,31 @@ create table if not exists public.nutrition_targets (
 
 alter table public.nutrition_targets enable row level security;
 
+-- Requires trainer_id AND that client_id is actually one of this trainer's
+-- own clients (via trainer_clients) - without the second half, any trainer
+-- could write (or keep reading after the relationship ends) targets for a
+-- client who was never theirs, the same class of gap closed on workout_logs
+-- in Phase 4.
 drop policy if exists "Trainers can manage own client nutrition targets" on public.nutrition_targets;
 create policy "Trainers can manage own client nutrition targets"
   on public.nutrition_targets for all
   to authenticated
-  using (auth.uid() = trainer_id)
-  with check (auth.uid() = trainer_id);
+  using (
+    auth.uid() = trainer_id
+    and exists (
+      select 1 from public.trainer_clients
+      where trainer_clients.client_id = nutrition_targets.client_id
+      and trainer_clients.trainer_id = auth.uid()
+    )
+  )
+  with check (
+    auth.uid() = trainer_id
+    and exists (
+      select 1 from public.trainer_clients
+      where trainer_clients.client_id = nutrition_targets.client_id
+      and trainer_clients.trainer_id = auth.uid()
+    )
+  );
 
 drop policy if exists "Clients can view own nutrition targets" on public.nutrition_targets;
 create policy "Clients can view own nutrition targets"
@@ -663,12 +701,21 @@ create table if not exists public.food_logs (
   client_id uuid not null references public.profiles (id) on delete cascade,
   logged_date date not null default current_date,
   name text not null,
+  -- Optional portion size, purely for the client's own reference (e.g.
+  -- "200g" vs "500g" of the same food) - calories/macros below are always
+  -- entered as the totals for whatever amount was actually eaten, not
+  -- recalculated from this, so changing it never changes the totals.
+  quantity_g integer check (quantity_g is null or quantity_g > 0),
   calories integer not null check (calories >= 0),
   protein_g numeric(6,1) not null default 0 check (protein_g >= 0),
   carbs_g numeric(6,1) not null default 0 check (carbs_g >= 0),
   fat_g numeric(6,1) not null default 0 check (fat_g >= 0),
   created_at timestamptz not null default now()
 );
+
+alter table public.food_logs add column if not exists quantity_g integer;
+alter table public.food_logs drop constraint if exists food_logs_quantity_g_check;
+alter table public.food_logs add constraint food_logs_quantity_g_check check (quantity_g is null or quantity_g > 0);
 
 create index if not exists food_logs_client_date_idx
   on public.food_logs (client_id, logged_date);

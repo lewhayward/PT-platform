@@ -12,18 +12,31 @@ async function NutritionSummary({
   supabase: Awaited<ReturnType<typeof createClient>>;
   clientId: string;
 }) {
-  const { data: targets } = await supabase
+  // Ordered + limited to one rather than .maybeSingle() - nutrition_targets
+  // is keyed by (trainer_id, client_id), not client_id alone, so a client
+  // with more than one trainer could have more than one row here.
+  const { data: targetRows, error: targetsError } = await supabase
     .from("nutrition_targets")
     .select("daily_calories")
     .eq("client_id", clientId)
-    .maybeSingle();
+    .order("updated_at", { ascending: false })
+    .limit(1);
+
+  if (targetsError) {
+    throw new Error(targetsError.message);
+  }
+  const targets = targetRows?.[0] ?? null;
 
   const todayIso = new Date().toISOString().slice(0, 10);
-  const { data: logs } = await supabase
+  const { data: logs, error: logsError } = await supabase
     .from("food_logs")
     .select("calories")
     .eq("client_id", clientId)
     .eq("logged_date", todayIso);
+
+  if (logsError) {
+    throw new Error(logsError.message);
+  }
 
   const caloriesLogged = (logs ?? []).reduce((sum, l) => sum + l.calories, 0);
 

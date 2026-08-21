@@ -16,7 +16,8 @@ function NutritionProgress({
   target: number | null;
   unit: string;
 }) {
-  const percent = target ? Math.min(100, Math.round((value / target) * 100)) : null;
+  const percent =
+    target !== null ? Math.min(100, Math.round((value / target) * 100)) : null;
 
   return (
     <div>
@@ -24,7 +25,7 @@ function NutritionProgress({
         <span className="text-foreground">{label}</span>
         <span className="text-muted">
           {value}
-          {target ? ` / ${target}` : ""} {unit}
+          {target !== null ? ` / ${target}` : ""} {unit}
         </span>
       </div>
       {percent !== null && (
@@ -39,23 +40,52 @@ function NutritionProgress({
   );
 }
 
+function foodSummary(food: {
+  quantity_g: number | null;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+}) {
+  const parts = [];
+  if (food.quantity_g) parts.push(`${food.quantity_g}g`);
+  parts.push(`${food.calories} kcal`);
+  parts.push(`P${food.protein_g} C${food.carbs_g} F${food.fat_g}`);
+  return parts.join(" · ");
+}
+
 export default async function ClientNutritionPage() {
   const profile = await requireProfile("client");
   const supabase = await createClient();
 
-  const { data: targets } = await supabase
+  // A client could in principle have more than one trainer (nutrition_targets
+  // is uniquely keyed by trainer+client, not client alone), so this can't
+  // assume at most one row - ordering by most-recently-updated and taking
+  // the first one, rather than .single(), keeps that case from erroring out
+  // and silently rendering "no targets set" instead.
+  const { data: targetRows, error: targetsError } = await supabase
     .from("nutrition_targets")
     .select("daily_calories, daily_protein_g, daily_carbs_g, daily_fat_g")
     .eq("client_id", profile.id)
-    .maybeSingle();
+    .order("updated_at", { ascending: false })
+    .limit(1);
+
+  if (targetsError) {
+    throw new Error(targetsError.message);
+  }
+  const targets = targetRows?.[0] ?? null;
 
   const todayIso = new Date().toISOString().slice(0, 10);
-  const { data: todaysLogs } = await supabase
+  const { data: todaysLogs, error: todaysLogsError } = await supabase
     .from("food_logs")
-    .select("id, name, calories, protein_g, carbs_g, fat_g")
+    .select("id, name, quantity_g, calories, protein_g, carbs_g, fat_g")
     .eq("client_id", profile.id)
     .eq("logged_date", todayIso)
     .order("created_at");
+
+  if (todaysLogsError) {
+    throw new Error(todaysLogsError.message);
+  }
 
   const totals = (todaysLogs ?? []).reduce(
     (acc, log) => ({
@@ -70,12 +100,16 @@ export default async function ClientNutritionPage() {
   // Recently logged foods, deduped by name so the same thing eaten several
   // times doesn't show up as several near-identical rows in the quick-add
   // list - most recent occurrence of each name wins.
-  const { data: recentLogs } = await supabase
+  const { data: recentLogs, error: recentLogsError } = await supabase
     .from("food_logs")
-    .select("id, name, calories, protein_g, carbs_g, fat_g")
+    .select("id, name, quantity_g, calories, protein_g, carbs_g, fat_g")
     .eq("client_id", profile.id)
     .order("created_at", { ascending: false })
     .limit(50);
+
+  if (recentLogsError) {
+    throw new Error(recentLogsError.message);
+  }
 
   const seenNames = new Set<string>();
   const recentFoods = [];
@@ -147,10 +181,7 @@ export default async function ClientNutritionPage() {
               >
                 <div>
                   <p className="text-foreground">{food.name}</p>
-                  <p className="text-muted">
-                    {food.calories} kcal · P{food.protein_g} C{food.carbs_g} F
-                    {food.fat_g}
-                  </p>
+                  <p className="text-muted">{foodSummary(food)}</p>
                 </div>
                 <form action={reAddFood.bind(null, food.id)}>
                   <Button
@@ -179,10 +210,7 @@ export default async function ClientNutritionPage() {
               >
                 <div>
                   <p className="text-foreground">{log.name}</p>
-                  <p className="text-muted">
-                    {log.calories} kcal · P{log.protein_g} C{log.carbs_g} F
-                    {log.fat_g}
-                  </p>
+                  <p className="text-muted">{foodSummary(log)}</p>
                 </div>
                 <form action={deleteFoodLog.bind(null, log.id)}>
                   <Button type="submit" variant="ghost" className="h-9 px-3 text-xs">

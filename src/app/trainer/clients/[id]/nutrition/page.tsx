@@ -30,12 +30,16 @@ export default async function NutritionTargetsPage(
 
   const clientName = profile?.full_name ?? client.email;
 
-  const { data: targets } = await supabase
+  const { data: targets, error: targetsError } = await supabase
     .from("nutrition_targets")
     .select("daily_calories, daily_protein_g, daily_carbs_g, daily_fat_g")
     .eq("client_id", client.client_id)
     .eq("trainer_id", trainer.id)
     .maybeSingle();
+
+  if (targetsError) {
+    throw new Error(targetsError.message);
+  }
 
   return (
     <div className="mx-auto max-w-lg">

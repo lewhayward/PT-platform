@@ -31,22 +31,34 @@ export default async function NutritionHistoryPage(
 
   const clientName = profile?.full_name ?? client.email;
 
-  const { data: targets } = await supabase
+  const { data: targets, error: targetsError } = await supabase
     .from("nutrition_targets")
     .select("daily_calories, daily_protein_g, daily_carbs_g, daily_fat_g")
     .eq("client_id", client.client_id)
     .eq("trainer_id", trainer.id)
     .maybeSingle();
 
-  // food_logs has no per-day cap, so this pulls a generous window of raw
-  // entries and groups them into calendar days in JS below, rather than
-  // trying to express "the last 14 distinct dates" in SQL.
-  const { data: logs } = await supabase
+  if (targetsError) {
+    throw new Error(targetsError.message);
+  }
+
+  // Bounded by calendar date, not by row count - a row-count limit here
+  // would silently truncate a heavily-logged recent day's totals rather
+  // than dropping only genuinely older days.
+  const cutoff = new Date();
+  cutoff.setUTCDate(cutoff.getUTCDate() - (DAYS_SHOWN - 1));
+  const cutoffIso = cutoff.toISOString().slice(0, 10);
+
+  const { data: logs, error: logsError } = await supabase
     .from("food_logs")
     .select("logged_date, name, calories, protein_g, carbs_g, fat_g")
     .eq("client_id", client.client_id)
-    .order("logged_date", { ascending: false })
-    .limit(500);
+    .gte("logged_date", cutoffIso)
+    .order("logged_date", { ascending: false });
+
+  if (logsError) {
+    throw new Error(logsError.message);
+  }
 
   const totalsByDate = new Map<
     string,

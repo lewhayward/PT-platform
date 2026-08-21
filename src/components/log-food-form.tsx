@@ -19,6 +19,21 @@ export function LogFoodForm() {
         <Input id="name" name="name" placeholder="e.g. Chicken and rice" />
       </Field>
 
+      <Field
+        label="Amount (g) - optional"
+        htmlFor="quantityG"
+        error={state?.errors?.quantityG?.[0]}
+      >
+        <Input
+          id="quantityG"
+          name="quantityG"
+          type="number"
+          min={1}
+          max={5000}
+          placeholder="e.g. 200"
+        />
+      </Field>
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Field
           label="Calories"

@@ -189,6 +189,7 @@ export interface FoodLog {
   client_id: string;
   logged_date: string;
   name: string;
+  quantity_g: number | null;
   calories: number;
   protein_g: number;
   carbs_g: number;

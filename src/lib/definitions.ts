@@ -152,27 +152,46 @@ export const WorkoutLogRepsSchema = z.coerce
 
 export type LogWorkoutFormState = { message?: string } | undefined;
 
+// z.coerce.number() turns an empty string into 0 (Number("") === 0), which
+// would let a blank field silently save as a real "0" target/value instead
+// of being rejected. This forces a blank/missing field to fail the number
+// check with a proper message, instead of quietly becoming zero.
+function requiredCoercedNumber<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess(
+    (val) => (val === "" || val === null || val === undefined ? undefined : val),
+    schema
+  );
+}
+
 export const NutritionTargetsSchema = z.object({
-  dailyCalories: z.coerce
-    .number({ error: "Enter a daily calorie target." })
-    .int()
-    .min(500, { error: "That looks too low - use 500 or more." })
-    .max(10000, { error: "That looks too high - use 10,000 or less." }),
-  dailyProteinG: z.coerce
-    .number({ error: "Enter a daily protein target in grams." })
-    .int()
-    .min(0)
-    .max(999),
-  dailyCarbsG: z.coerce
-    .number({ error: "Enter a daily carbs target in grams." })
-    .int()
-    .min(0)
-    .max(999),
-  dailyFatG: z.coerce
-    .number({ error: "Enter a daily fat target in grams." })
-    .int()
-    .min(0)
-    .max(999),
+  dailyCalories: requiredCoercedNumber(
+    z.coerce
+      .number({ error: "Enter a daily calorie target." })
+      .int()
+      .min(500, { error: "That looks too low - use 500 or more." })
+      .max(10000, { error: "That looks too high - use 10,000 or less." })
+  ),
+  dailyProteinG: requiredCoercedNumber(
+    z.coerce
+      .number({ error: "Enter a daily protein target in grams." })
+      .int()
+      .min(0)
+      .max(999)
+  ),
+  dailyCarbsG: requiredCoercedNumber(
+    z.coerce
+      .number({ error: "Enter a daily carbs target in grams." })
+      .int()
+      .min(0)
+      .max(999)
+  ),
+  dailyFatG: requiredCoercedNumber(
+    z.coerce
+      .number({ error: "Enter a daily fat target in grams." })
+      .int()
+      .min(0)
+      .max(999)
+  ),
 });
 
 export type NutritionTargetsFormState =
@@ -187,35 +206,59 @@ export type NutritionTargetsFormState =
     }
   | undefined;
 
+// A macro left blank means "didn't measure it" - defaults to 0 rather than
+// being rejected, but explicitly (via preprocess) rather than by accident of
+// z.coerce.number()'s "" -> 0 behaviour, which would do the same thing for
+// EVERY field, including ones (like calories) that should never silently
+// default.
+function optionalCoercedNumber<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess(
+    (val) => (val === "" || val === null || val === undefined ? 0 : val),
+    schema
+  );
+}
+
 export const FoodLogSchema = z.object({
   name: z
     .string()
+    .trim()
     .min(1, { error: "Enter what you ate." })
-    .max(200, { error: "That name is too long." })
-    .trim(),
-  calories: z.coerce
-    .number({ error: "Enter the calories." })
-    .int()
-    .min(0)
-    .max(20000, { error: "That doesn't look right - use 20,000 or less." }),
-  proteinG: z.coerce
-    .number({ error: "Enter the protein in grams." })
-    .min(0)
-    .max(9999),
-  carbsG: z.coerce
-    .number({ error: "Enter the carbs in grams." })
-    .min(0)
-    .max(9999),
-  fatG: z.coerce
-    .number({ error: "Enter the fat in grams." })
-    .min(0)
-    .max(9999),
+    .max(200, { error: "That name is too long." }),
+  // Optional portion size, purely for the client's own reference - not used
+  // to calculate calories/macros, which are always entered directly below
+  // for whatever amount was actually eaten.
+  quantityG: z.preprocess(
+    (val) => (val === "" || val === null || val === undefined ? undefined : val),
+    z.coerce
+      .number({ error: "Enter the amount in grams." })
+      .int()
+      .min(1, { error: "Amount must be more than 0." })
+      .max(5000, { error: "That doesn't look right - use 5,000g or less." })
+      .optional()
+  ),
+  calories: requiredCoercedNumber(
+    z.coerce
+      .number({ error: "Enter the calories." })
+      .int()
+      .min(0)
+      .max(20000, { error: "That doesn't look right - use 20,000 or less." })
+  ),
+  proteinG: optionalCoercedNumber(
+    z.coerce.number({ error: "Enter the protein in grams." }).min(0).max(9999)
+  ),
+  carbsG: optionalCoercedNumber(
+    z.coerce.number({ error: "Enter the carbs in grams." }).min(0).max(9999)
+  ),
+  fatG: optionalCoercedNumber(
+    z.coerce.number({ error: "Enter the fat in grams." }).min(0).max(9999)
+  ),
 });
 
 export type FoodLogFormState =
   | {
       errors?: {
         name?: string[];
+        quantityG?: string[];
         calories?: string[];
         proteinG?: string[];
         carbsG?: string[];
