@@ -31,10 +31,44 @@ export function LogFoodForm({ foods }: { foods: FoodOption[] }) {
     [foods]
   );
 
+  // The <form>'s `key` remounts it after a successful save, clearing every
+  // plain input - but selectedFood/quantity live on THIS component, one
+  // level up, so they'd otherwise survive that remount and silently
+  // auto-fill the next (blank-named) entry with the previous food's macros
+  // the moment a gram amount is typed. Reset during render (React's
+  // documented "adjusting state when a prop changes" pattern) rather than
+  // in an effect, so it happens before the stale values could ever paint.
+  const [lastHandledSavedAt, setLastHandledSavedAt] = useState(state?.savedAt);
+  if (state?.savedAt !== lastHandledSavedAt) {
+    setLastHandledSavedAt(state?.savedAt);
+    setSelectedFood(null);
+    setQuantity("");
+  }
+
+  function clearMacroFields() {
+    if (caloriesRef.current) caloriesRef.current.value = "";
+    if (proteinRef.current) proteinRef.current.value = "";
+    if (carbsRef.current) carbsRef.current.value = "";
+    if (fatRef.current) fatRef.current.value = "";
+  }
+
+  function handleNameChange(value: string) {
+    const match = foodsByName.get(value.trim().toLowerCase());
+    setSelectedFood(match ?? null);
+    // If the name no longer matches a library food, the fields currently
+    // showing that food's numbers are now stale and unexplained (the
+    // helper text below disappears too) - clearing them makes it obvious
+    // this is now a manual entry rather than leaving old numbers sitting
+    // there uncommented on.
+    if (!match) clearMacroFields();
+  }
+
   // Auto-fills calories/macros from the library once both a known food AND
   // a gram amount are entered - still just a starting point, every field
   // stays freely editable afterward for anything eaten slightly
-  // differently from the library value.
+  // differently from the library value. Re-deriving from selectedFood on
+  // every quantity change (rather than preserving a manual edit) is
+  // intentional - changing the amount is a request to recalculate.
   useEffect(() => {
     const grams = Number(quantity);
     if (!selectedFood || !grams || grams <= 0) return;
@@ -68,11 +102,7 @@ export function LogFoodForm({ foods }: { foods: FoodOption[] }) {
           name="name"
           list="food-options"
           placeholder="e.g. Chicken and rice"
-          onChange={(e) =>
-            setSelectedFood(
-              foodsByName.get(e.target.value.trim().toLowerCase()) ?? null
-            )
-          }
+          onChange={(e) => handleNameChange(e.target.value)}
         />
         <datalist id="food-options">
           {foods.map((food) => (

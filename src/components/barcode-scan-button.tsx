@@ -24,9 +24,14 @@ export function BarcodeScanButton({
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const stoppedRef = useRef(false);
+  const frameRef = useRef<number | null>(null);
 
   function stopCamera() {
     stoppedRef.current = true;
+    if (frameRef.current !== null) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    }
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
   }
@@ -36,14 +41,24 @@ export function BarcodeScanButton({
   async function handleBarcode(barcode: string) {
     setLookingUp(true);
     setMessage(null);
-    const result = await lookupBarcode(barcode);
-    setLookingUp(false);
-    if (!result.ok) {
-      setMessage(result.message);
-      return;
+    try {
+      const result = await lookupBarcode(barcode);
+      if (!result.ok) {
+        setMessage(result.message);
+        return;
+      }
+      setPanel("closed");
+      setManualBarcode("");
+      onScanned(result.food);
+    } catch {
+      // lookupBarcode is a server action - a network hiccup or an expired
+      // session surfaces here as a rejected promise, not a BarcodeLookupResult.
+      // Without this catch, "Looking up..." would spin forever with no way
+      // to try again.
+      setMessage("Something went wrong looking that up. Please try again.");
+    } finally {
+      setLookingUp(false);
     }
-    setPanel("closed");
-    onScanned(result.food);
   }
 
   async function startScan() {
@@ -62,11 +77,18 @@ export function BarcodeScanButton({
         video: { facingMode: "environment" },
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+      if (!videoRef.current) {
+        throw new Error("Video element not ready");
       }
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play();
     } catch {
+      // Covers both getUserMedia being denied/unavailable AND play()
+      // rejecting (common on mobile Safari) after the stream was already
+      // granted - stopCamera() here matters because without it, a stream
+      // acquired in the try block but never successfully attached would
+      // otherwise keep the camera's indicator light on indefinitely.
+      stopCamera();
       setPanel("manual");
       setMessage(
         "Couldn't access the camera - you can type the barcode number instead."
@@ -94,10 +116,15 @@ export function BarcodeScanButton({
       if (stoppedRef.current || !videoRef.current) return;
       try {
         const codes = await detector.detect(videoRef.current);
+        // Re-checked after the await, not just at the top of tick() - the
+        // user could have hit Cancel (or the component could have
+        // unmounted) while detection was in flight, and a code found on
+        // that stale pass shouldn't still fire a lookup/onScanned.
+        if (stoppedRef.current) return;
         if (codes.length > 0) {
           stopCamera();
           setPanel("closed");
-          handleBarcode(codes[0].rawValue);
+          await handleBarcode(codes[0].rawValue);
           return;
         }
       } catch {
@@ -105,9 +132,11 @@ export function BarcodeScanButton({
         // frame" - not fatal, keep trying until cancelled or a code is
         // found.
       }
-      requestAnimationFrame(tick);
+      if (!stoppedRef.current) {
+        frameRef.current = requestAnimationFrame(tick);
+      }
     };
-    requestAnimationFrame(tick);
+    frameRef.current = requestAnimationFrame(tick);
   }
 
   function cancel() {

@@ -58,10 +58,17 @@ export default async function ClientNutritionPage() {
   const profile = await requireProfile("client");
   const supabase = await createClient();
 
+  // Only the curated, no-barcode entries - these are the ones meant to be
+  // typed/searched by name. Barcode-cached products are looked up by their
+  // barcode instead (see the scan button), and this table only ever grows,
+  // so this also keeps the datalist from silently growing unbounded and
+  // eventually running into PostgREST's row cap.
   const { data: foodOptions, error: foodsError } = await supabase
     .from("foods")
     .select("name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g")
-    .order("name");
+    .is("barcode", null)
+    .order("name")
+    .limit(500);
 
   if (foodsError) {
     throw new Error(foodsError.message);

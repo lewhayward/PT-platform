@@ -754,15 +754,33 @@ create policy "Trainers can view their clients' food logs"
 -- never stored twice.
 create table if not exists public.foods (
   id uuid primary key default gen_random_uuid(),
-  name text not null,
+  name text not null check (char_length(name) between 1 and 200),
   brand text,
-  barcode text unique,
-  calories_per_100g numeric(6,1) not null check (calories_per_100g >= 0),
-  protein_per_100g numeric(6,1) not null default 0 check (protein_per_100g >= 0),
-  carbs_per_100g numeric(6,1) not null default 0 check (carbs_per_100g >= 0),
-  fat_per_100g numeric(6,1) not null default 0 check (fat_per_100g >= 0),
+  barcode text unique check (barcode is null or barcode ~ '^[0-9]{6,14}$'),
+  -- Upper bounds are real-world plausibility limits (pure fat/oil tops out
+  -- around 900 kcal/100g; no macro can exceed 100g per 100g of food) - a
+  -- data-integrity backstop that holds regardless of which client wrote
+  -- the row, not a security boundary.
+  calories_per_100g numeric(6,1) not null check (calories_per_100g >= 0 and calories_per_100g <= 900),
+  protein_per_100g numeric(6,1) not null default 0 check (protein_per_100g >= 0 and protein_per_100g <= 100),
+  carbs_per_100g numeric(6,1) not null default 0 check (carbs_per_100g >= 0 and carbs_per_100g <= 100),
+  fat_per_100g numeric(6,1) not null default 0 check (fat_per_100g >= 0 and fat_per_100g <= 100),
   created_at timestamptz not null default now()
 );
+
+alter table public.foods add column if not exists brand text;
+alter table public.foods drop constraint if exists foods_name_check;
+alter table public.foods add constraint foods_name_check check (char_length(name) between 1 and 200);
+alter table public.foods drop constraint if exists foods_barcode_check;
+alter table public.foods add constraint foods_barcode_check check (barcode is null or barcode ~ '^[0-9]{6,14}$');
+alter table public.foods drop constraint if exists foods_calories_per_100g_check;
+alter table public.foods add constraint foods_calories_per_100g_check check (calories_per_100g >= 0 and calories_per_100g <= 900);
+alter table public.foods drop constraint if exists foods_protein_per_100g_check;
+alter table public.foods add constraint foods_protein_per_100g_check check (protein_per_100g >= 0 and protein_per_100g <= 100);
+alter table public.foods drop constraint if exists foods_carbs_per_100g_check;
+alter table public.foods add constraint foods_carbs_per_100g_check check (carbs_per_100g >= 0 and carbs_per_100g <= 100);
+alter table public.foods drop constraint if exists foods_fat_per_100g_check;
+alter table public.foods add constraint foods_fat_per_100g_check check (fat_per_100g >= 0 and fat_per_100g <= 100);
 
 -- Keeps the curated seed data (barcode is null) safely re-insertable via
 -- "on conflict (name) where barcode is null do nothing", the same pattern
@@ -782,13 +800,14 @@ create policy "Anyone signed in can view foods"
   to authenticated
   using (true);
 
--- Only lets a new row in when it carries a barcode, so this stays a path
--- for CACHING a barcode lookup result (see lookupBarcode) rather than a
--- general-purpose way for any signed-in user to add arbitrary entries to
--- the shared library - the curated, no-barcode seed data can only be added
--- by re-running seed.sql, same as the exercise library.
+-- Deliberately no insert/update/delete policy for regular signed-in users -
+-- a policy that let any authenticated client (or trainer) write here at
+-- all would let them silently corrupt the SHARED library for everyone,
+-- including shadowing a real seeded food's macros with a same-named row
+-- (the "on conflict (name) where barcode is null" partial index doesn't
+-- protect against that - it only dedupes exact seed re-runs). Caching a
+-- barcode lookup (see lookupBarcode in src/app/client/nutrition/actions.ts)
+-- goes through the admin/service-role client instead, which bypasses RLS
+-- entirely - the CHECK constraints above are what actually keep that
+-- write's values sane, not a policy.
 drop policy if exists "Anyone signed in can cache a barcode lookup" on public.foods;
-create policy "Anyone signed in can cache a barcode lookup"
-  on public.foods for insert
-  to authenticated
-  with check (barcode is not null);
