@@ -36,7 +36,10 @@ export default async function ClientProfilePage(
 
   return (
     <div className="mx-auto max-w-lg">
-      <div className="flex items-center justify-between">
+      <Link href="/trainer" className="text-sm text-accent">
+        Back to clients
+      </Link>
+      <div className="mt-2 flex items-center justify-between">
         <h2 className="text-xl font-semibold text-foreground">
           {profile?.full_name ?? client.email}
         </h2>
