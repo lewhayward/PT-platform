@@ -58,6 +58,23 @@ export default async function ClientNutritionPage() {
   const profile = await requireProfile("client");
   const supabase = await createClient();
 
+  const { data: foodOptions, error: foodsError } = await supabase
+    .from("foods")
+    .select("name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g")
+    .order("name");
+
+  if (foodsError) {
+    throw new Error(foodsError.message);
+  }
+
+  const foods = (foodOptions ?? []).map((food) => ({
+    name: food.name,
+    caloriesPer100g: Number(food.calories_per_100g),
+    proteinPer100g: Number(food.protein_per_100g),
+    carbsPer100g: Number(food.carbs_per_100g),
+    fatPer100g: Number(food.fat_per_100g),
+  }));
+
   // A client could in principle have more than one trainer (nutrition_targets
   // is uniquely keyed by trainer+client, not client alone), so this can't
   // assume at most one row - ordering by most-recently-updated and taking
@@ -166,7 +183,7 @@ export default async function ClientNutritionPage() {
       <Card className="mt-4">
         <h3 className="text-sm font-medium text-muted">Log food</h3>
         <div className="mt-3">
-          <LogFoodForm />
+          <LogFoodForm foods={foods} />
         </div>
       </Card>
 

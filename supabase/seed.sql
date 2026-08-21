@@ -363,3 +363,131 @@ from (values
 ) as x(programme_template_name, day_of_week, workout_template_name)
 join public.programme_templates pt on pt.name = x.programme_template_name
 join public.workout_templates wt on wt.name = x.workout_template_name and wt.trainer_id is null;
+
+-- ============================================================================
+-- Common foods library (Phase 5 nutrition tracking)
+--
+-- Typical values per 100g, for quick estimates when logging food - not
+-- guaranteed to match any specific brand or product. Clients can always
+-- type their own calories/macros by hand instead, or scan a packaged
+-- product's barcode to look up its actual label values.
+--
+-- Safe to re-run: `on conflict (name) where barcode is null do nothing`
+-- only ever adds new rows here, never overwrites or removes one -
+-- including any a client's already-logged food history might reference.
+-- ============================================================================
+
+insert into public.foods (name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g) values
+  -- Meat, fish & eggs
+  ('Chicken Breast, cooked', 165, 31, 0, 3.6),
+  ('Chicken Breast, raw', 120, 22.5, 0, 2.6),
+  ('Chicken Thigh, cooked (skinless)', 209, 26, 0, 10.9),
+  ('Turkey Breast, cooked', 135, 30, 0, 1),
+  ('Turkey Mince, cooked', 176, 27, 0, 8),
+  ('Beef Mince (5% fat), cooked', 172, 26, 0, 7),
+  ('Beef Mince (20% fat), cooked', 254, 22, 0, 18),
+  ('Sirloin Steak, cooked', 271, 27, 0, 17.5),
+  ('Pork Loin, cooked', 201, 29, 0, 9),
+  ('Bacon, cooked', 541, 37, 1.4, 42),
+  ('Ham, sliced', 145, 21, 1.5, 5.5),
+  ('Sausages (pork), cooked', 300, 15, 6, 25),
+  ('Salmon, cooked', 208, 20, 0, 13),
+  ('Tuna, canned in water (drained)', 116, 26, 0, 0.8),
+  ('Cod, cooked', 105, 23, 0, 0.9),
+  ('Prawns, cooked', 99, 24, 0.2, 0.3),
+  ('Eggs, whole, boiled', 155, 13, 1.1, 11),
+  ('Egg Whites', 52, 11, 0.7, 0.2),
+
+  -- Dairy
+  ('Greek Yoghurt (0% fat)', 57, 10, 3.6, 0.4),
+  ('Greek Yoghurt (full fat)', 97, 9, 4, 5),
+  ('Cottage Cheese (low fat)', 72, 12, 3, 1),
+  ('Milk, whole', 61, 3.3, 4.8, 3.3),
+  ('Milk, semi-skimmed', 50, 3.4, 4.8, 1.8),
+  ('Milk, skimmed', 34, 3.4, 5, 0.1),
+  ('Cheddar Cheese', 402, 25, 0.1, 33),
+  ('Mozzarella', 280, 28, 3, 17),
+  ('Feta Cheese', 264, 14, 4, 21),
+  ('Halloumi', 321, 22, 2, 25),
+  ('Whey Protein Powder', 380, 80, 8, 4),
+
+  -- Grains, bread & potatoes
+  ('White Rice, cooked', 130, 2.7, 28, 0.3),
+  ('Brown Rice, cooked', 123, 2.6, 25.6, 1),
+  ('Rolled Oats, dry', 389, 17, 66, 7),
+  ('Porridge, made with water', 55, 1.9, 9.5, 1.1),
+  ('Muesli', 362, 9, 66, 6),
+  ('Granola', 471, 10, 64, 20),
+  ('Wholemeal Bread', 247, 13, 41, 3.4),
+  ('White Bread', 265, 9, 49, 3.2),
+  ('Bagel', 250, 9, 49, 1.5),
+  ('Pasta, cooked', 131, 5, 25, 1.1),
+  ('Couscous, cooked', 112, 3.8, 23, 0.2),
+  ('Quinoa, cooked', 120, 4.4, 21, 1.9),
+  ('White Potato, boiled', 87, 1.9, 20, 0.1),
+  ('Sweet Potato, cooked', 90, 2, 21, 0.1),
+  ('White Rice Cakes', 387, 8, 81, 3),
+
+  -- Legumes & plant protein
+  ('Chickpeas, cooked', 164, 8.9, 27, 2.6),
+  ('Black Beans, cooked', 132, 8.9, 24, 0.5),
+  ('Kidney Beans, cooked', 127, 8.7, 23, 0.5),
+  ('Lentils, cooked', 116, 9, 20, 0.4),
+  ('Baked Beans (in tomato sauce)', 75, 4.7, 13, 0.4),
+  ('Tofu, firm', 144, 15.5, 3.9, 8.7),
+  ('Edamame', 121, 12, 9.9, 5),
+  ('Hummus', 166, 7.9, 11, 9.6),
+
+  -- Fats, nuts & seeds
+  ('Olive Oil', 884, 0, 0, 100),
+  ('Butter', 717, 0.9, 0.1, 81),
+  ('Peanut Butter', 588, 25, 20, 50),
+  ('Almonds', 579, 21, 22, 50),
+  ('Walnuts', 654, 15, 14, 65),
+  ('Cashews', 553, 18, 30, 44),
+  ('Pistachios', 560, 20, 28, 45),
+  ('Peanuts', 567, 26, 16, 49),
+  ('Sunflower Seeds', 584, 21, 20, 51),
+  ('Chia Seeds', 486, 17, 42, 31),
+  ('Avocado', 160, 2, 8.5, 14.7),
+
+  -- Fruit
+  ('Banana', 89, 1.1, 23, 0.3),
+  ('Apple', 52, 0.3, 14, 0.2),
+  ('Orange', 47, 0.9, 12, 0.1),
+  ('Strawberries', 32, 0.7, 7.7, 0.3),
+  ('Blueberries', 57, 0.7, 14, 0.3),
+  ('Grapes', 69, 0.6, 18, 0.2),
+  ('Mango', 60, 0.8, 15, 0.4),
+
+  -- Vegetables
+  ('Broccoli, steamed', 35, 2.8, 7, 0.4),
+  ('Spinach, raw', 23, 2.9, 3.6, 0.4),
+  ('Carrots, raw', 41, 0.9, 10, 0.2),
+  ('Mixed Salad Leaves', 15, 1.4, 2.9, 0.2),
+  ('Green Beans, steamed', 35, 1.8, 7, 0.2),
+  ('Bell Pepper', 31, 1, 6, 0.3),
+  ('Cucumber', 15, 0.7, 3.6, 0.1),
+  ('Tomato', 18, 0.9, 3.9, 0.2),
+  ('Mushrooms', 22, 3.1, 3.3, 0.3),
+  ('Cauliflower', 25, 1.9, 5, 0.3),
+  ('Onion', 40, 1.1, 9.3, 0.1),
+  ('Sweetcorn', 96, 3.4, 21, 1.5),
+  ('Peas', 81, 5.4, 14, 0.4),
+  ('Beetroot', 43, 1.6, 10, 0.2),
+
+  -- Snacks, sauces & drinks
+  ('Dark Chocolate (70%)', 598, 7.8, 46, 43),
+  ('Milk Chocolate', 535, 7.6, 59, 30),
+  ('Crisps (potato chips)', 536, 6.6, 53, 34),
+  ('Popcorn, air-popped', 387, 12.9, 78, 4.5),
+  ('Protein Bar', 370, 30, 35, 12),
+  ('Honey', 304, 0.3, 82, 0),
+  ('Jam', 278, 0.4, 69, 0.1),
+  ('Ketchup', 101, 1.2, 24, 0.1),
+  ('Mayonnaise', 680, 1, 3, 75),
+  ('Orange Juice', 45, 0.7, 10.4, 0.2),
+  ('Almond Milk, unsweetened', 15, 0.5, 0.3, 1.1),
+  ('Soy Milk', 33, 3.3, 0.6, 1.8),
+  ('Coconut Milk, canned', 230, 2.3, 6, 24)
+on conflict (name) where barcode is null do nothing;

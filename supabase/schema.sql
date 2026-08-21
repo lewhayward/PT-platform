@@ -743,3 +743,52 @@ create policy "Trainers can view their clients' food logs"
       and trainer_clients.trainer_id = auth.uid()
     )
   );
+
+-- A shared reference library of common foods with per-100g values, like
+-- `exercises` above - not owned by any one trainer or client. Lets the
+-- log-food form auto-fill calories/macros once someone enters a gram
+-- amount, instead of always requiring them to work it out by hand.
+-- `barcode` is populated either by the seed data or by caching a lookup
+-- from the Open Food Facts API the first time someone scans it (see
+-- src/app/client/nutrition/actions.ts) - unique so the same product is
+-- never stored twice.
+create table if not exists public.foods (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  brand text,
+  barcode text unique,
+  calories_per_100g numeric(6,1) not null check (calories_per_100g >= 0),
+  protein_per_100g numeric(6,1) not null default 0 check (protein_per_100g >= 0),
+  carbs_per_100g numeric(6,1) not null default 0 check (carbs_per_100g >= 0),
+  fat_per_100g numeric(6,1) not null default 0 check (fat_per_100g >= 0),
+  created_at timestamptz not null default now()
+);
+
+-- Keeps the curated seed data (barcode is null) safely re-insertable via
+-- "on conflict (name) where barcode is null do nothing", the same pattern
+-- used for workout_templates_starter_name_idx above - without this being
+-- partial, two different barcode-cached products that happen to share a
+-- display name (e.g. a regional variant) would be blocked from both
+-- existing, which isn't a real conflict.
+create unique index if not exists foods_seed_name_idx
+  on public.foods (name)
+  where barcode is null;
+
+alter table public.foods enable row level security;
+
+drop policy if exists "Anyone signed in can view foods" on public.foods;
+create policy "Anyone signed in can view foods"
+  on public.foods for select
+  to authenticated
+  using (true);
+
+-- Only lets a new row in when it carries a barcode, so this stays a path
+-- for CACHING a barcode lookup result (see lookupBarcode) rather than a
+-- general-purpose way for any signed-in user to add arbitrary entries to
+-- the shared library - the curated, no-barcode seed data can only be added
+-- by re-running seed.sql, same as the exercise library.
+drop policy if exists "Anyone signed in can cache a barcode lookup" on public.foods;
+create policy "Anyone signed in can cache a barcode lookup"
+  on public.foods for insert
+  to authenticated
+  with check (barcode is not null);

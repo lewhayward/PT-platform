@@ -8,7 +8,7 @@ progress tracking in one place.
 - **Phase 2**: trainers can invite clients by email, see their client list, and open a client's profile
 - **Phase 3**: trainers can build a client's weekly workout programme, with a built-in exercise library, suggested starter programmes, and easy re-use of workouts already built
 - **Phase 4**: clients log what they actually did (reps/weight per set) against their assigned workout, and trainers can see completed vs. assigned per client
-- **Phase 5**: trainers set daily calorie/macro targets per client, clients log food eaten (with a one-tap "log again" for anything eaten before), and trainers can see day-by-day nutrition history vs. targets
+- **Phase 5**: trainers set daily calorie/macro targets per client, clients log food eaten (with a one-tap "log again" for anything eaten before), and trainers can see day-by-day nutrition history vs. targets. Includes a built-in library of ~100 common foods (auto-fills calories/macros once you type a food and a gram amount) and a barcode scanner for packaged foods
 
 No progress-tracking features yet - that comes in a later phase.
 
@@ -30,8 +30,11 @@ No progress-tracking features yet - that comes in a later phase.
 - `exercises`, `workout_templates`, `programme_templates` and related tables for Phase 3's workout programming
 - `workout_logs` and related tables for Phase 4's workout logging
 - `nutrition_targets` and `food_logs` for Phase 5's nutrition tracking
+- `foods`, a shared library of common foods with per-100g calories/macros, seeded with ~100 everyday items and grown automatically whenever someone scans a new barcode
 
 Both files are safe to re-run any time (e.g. after pulling an update) - they won't duplicate data or wipe anything a trainer or client has already entered.
+
+**A note on barcode scanning**: it uses the phone/browser's built-in barcode reader (no extra app or library needed), but not every browser supports this yet - notably some versions of Safari on iPhone don't. Where it isn't supported, the scan button automatically falls back to a "type the barcode number" box instead, which still looks the product up the same way - just without the camera step.
 
 ## 3. Add your environment variables
 
@@ -116,11 +119,13 @@ If all of that works, Phase 4 is solid.
 
 1. **Log in as a trainer**, open a client's profile, and click **Nutrition targets**. Set a daily calorie target and protein/carbs/fat targets in grams, then save.
 2. **Log in as that client** (or open an incognito window) - their dashboard should show a "Nutrition" card. Click **Log food**.
-3. Type in a food name, optionally the amount in grams, plus its calories and macros, and **Log food**. It should appear under "Logged today" (with the gram amount shown if you entered one), and the totals at the top should update against the targets you set.
-4. **Log the same food again**: it should now appear under "Recently logged" - click the **+** next to it. It should be added again with the same values, no retyping needed.
-5. **Remove an entry**: click **Remove** on a logged item - it should disappear and the totals should update.
-6. **Log in as that client's trainer** again, open their profile, and click **Nutrition history**. You should see today listed with the totals vs. targets you'd expect.
-7. **Check the guard**: while logged in as a different trainer, try visiting another trainer's client's nutrition pages directly via URL - you should get a "not found" page.
+3. **Try the food library**: start typing a common food (e.g. "Chicken Breast, cooked") into the Food field - you should see it suggested. Pick it, then type an amount in grams - the calories/protein/carbs/fat fields should fill in automatically. Adjust one if you like, then **Log food**. It should appear under "Logged today" (with the gram amount shown), and the totals at the top should update against the targets you set.
+4. **Try scanning a barcode** (on a phone, or a laptop with a webcam): click **Scan barcode** on a packaged food and point the camera at its barcode. It should look the product up and fill in its name/calories/macros automatically - enter how many grams you had and adjust if needed, then log it. If your browser doesn't support camera scanning, you'll get a box to type the barcode's digits instead - the lookup works the same either way.
+5. Try a food that's neither in the library nor has a barcode (e.g. a home-cooked meal) - typing its name should just leave the calories/macros fields blank for you to fill in by hand, same as before.
+6. **Log the same food again**: it should now appear under "Recently logged" - click the **+** next to it. It should be added again with the same values, no retyping needed.
+7. **Remove an entry**: click **Remove** on a logged item - it should disappear and the totals should update.
+8. **Log in as that client's trainer** again, open their profile, and click **Nutrition history**. You should see today listed with the totals vs. targets you'd expect.
+9. **Check the guard**: while logged in as a different trainer, try visiting another trainer's client's nutrition pages directly via URL - you should get a "not found" page.
 
 If all of that works, Phase 5 is solid.
 
