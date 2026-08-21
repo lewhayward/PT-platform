@@ -151,3 +151,80 @@ export const WorkoutLogRepsSchema = z.coerce
   .max(999, { error: "That doesn't look right - reps must be 999 or under." });
 
 export type LogWorkoutFormState = { message?: string } | undefined;
+
+export const NutritionTargetsSchema = z.object({
+  dailyCalories: z.coerce
+    .number({ error: "Enter a daily calorie target." })
+    .int()
+    .min(500, { error: "That looks too low - use 500 or more." })
+    .max(10000, { error: "That looks too high - use 10,000 or less." }),
+  dailyProteinG: z.coerce
+    .number({ error: "Enter a daily protein target in grams." })
+    .int()
+    .min(0)
+    .max(999),
+  dailyCarbsG: z.coerce
+    .number({ error: "Enter a daily carbs target in grams." })
+    .int()
+    .min(0)
+    .max(999),
+  dailyFatG: z.coerce
+    .number({ error: "Enter a daily fat target in grams." })
+    .int()
+    .min(0)
+    .max(999),
+});
+
+export type NutritionTargetsFormState =
+  | {
+      errors?: {
+        dailyCalories?: string[];
+        dailyProteinG?: string[];
+        dailyCarbsG?: string[];
+        dailyFatG?: string[];
+      };
+      message?: string;
+    }
+  | undefined;
+
+export const FoodLogSchema = z.object({
+  name: z
+    .string()
+    .min(1, { error: "Enter what you ate." })
+    .max(200, { error: "That name is too long." })
+    .trim(),
+  calories: z.coerce
+    .number({ error: "Enter the calories." })
+    .int()
+    .min(0)
+    .max(20000, { error: "That doesn't look right - use 20,000 or less." }),
+  proteinG: z.coerce
+    .number({ error: "Enter the protein in grams." })
+    .min(0)
+    .max(9999),
+  carbsG: z.coerce
+    .number({ error: "Enter the carbs in grams." })
+    .min(0)
+    .max(9999),
+  fatG: z.coerce
+    .number({ error: "Enter the fat in grams." })
+    .min(0)
+    .max(9999),
+});
+
+export type FoodLogFormState =
+  | {
+      errors?: {
+        name?: string[];
+        calories?: string[];
+        proteinG?: string[];
+        carbsG?: string[];
+        fatG?: string[];
+      };
+      message?: string;
+      // Set on success only, to a fresh value each time - the form uses it
+      // as a React `key` so it remounts with blank fields instead of
+      // leaving the just-logged food sitting in the inputs.
+      savedAt?: number;
+    }
+  | undefined;

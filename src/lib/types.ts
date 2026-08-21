@@ -173,3 +173,24 @@ export interface WorkoutLog {
   logged_date: string;
   notes: string | null;
 }
+
+export interface NutritionTargets {
+  id: string;
+  trainer_id: string;
+  client_id: string;
+  daily_calories: number;
+  daily_protein_g: number;
+  daily_carbs_g: number;
+  daily_fat_g: number;
+}
+
+export interface FoodLog {
+  id: string;
+  client_id: string;
+  logged_date: string;
+  name: string;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+}

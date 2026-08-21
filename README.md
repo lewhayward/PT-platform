@@ -8,8 +8,9 @@ progress tracking in one place.
 - **Phase 2**: trainers can invite clients by email, see their client list, and open a client's profile
 - **Phase 3**: trainers can build a client's weekly workout programme, with a built-in exercise library, suggested starter programmes, and easy re-use of workouts already built
 - **Phase 4**: clients log what they actually did (reps/weight per set) against their assigned workout, and trainers can see completed vs. assigned per client
+- **Phase 5**: trainers set daily calorie/macro targets per client, clients log food eaten (with a one-tap "log again" for anything eaten before), and trainers can see day-by-day nutrition history vs. targets
 
-No nutrition or progress-tracking features yet - those come in later phases.
+No progress-tracking features yet - that comes in a later phase.
 
 ## 1. Create your Supabase project
 
@@ -28,6 +29,7 @@ No nutrition or progress-tracking features yet - those come in later phases.
 - a `trainer_clients` table linking each trainer to the clients they've invited, with email, goals, notes, primary goal, days per week, and a status (Invited / Active)
 - `exercises`, `workout_templates`, `programme_templates` and related tables for Phase 3's workout programming
 - `workout_logs` and related tables for Phase 4's workout logging
+- `nutrition_targets` and `food_logs` for Phase 5's nutrition tracking
 
 Both files are safe to re-run any time (e.g. after pulling an update) - they won't duplicate data or wipe anything a trainer or client has already entered.
 
@@ -110,6 +112,18 @@ If all of that works, Phase 3 is solid.
 
 If all of that works, Phase 4 is solid.
 
+## How to test Phase 5
+
+1. **Log in as a trainer**, open a client's profile, and click **Nutrition targets**. Set a daily calorie target and protein/carbs/fat targets in grams, then save.
+2. **Log in as that client** (or open an incognito window) - their dashboard should show a "Nutrition" card. Click **Log food**.
+3. Type in a food name plus its calories and macros, and **Log food**. It should appear under "Logged today", and the totals at the top should update against the targets you set.
+4. **Log the same food again**: it should now appear under "Recently logged" - click the **+** next to it. It should be added again with the same values, no retyping needed.
+5. **Remove an entry**: click **Remove** on a logged item - it should disappear and the totals should update.
+6. **Log in as that client's trainer** again, open their profile, and click **Nutrition history**. You should see today listed with the totals vs. targets you'd expect.
+7. **Check the guard**: while logged in as a different trainer, try visiting another trainer's client's nutrition pages directly via URL - you should get a "not found" page.
+
+If all of that works, Phase 5 is solid.
+
 ## Project structure
 
 - `src/app/` - pages and routes (Next.js App Router)
@@ -117,6 +131,8 @@ If all of that works, Phase 4 is solid.
 - `src/app/trainer/clients/actions.ts` - inviting a client
 - `src/app/trainer/clients/[id]/programme/actions.ts` - building, editing, and reusing a client's workout programme
 - `src/app/client/log/actions.ts` - a client logging what they actually did against today's plan
+- `src/app/trainer/clients/[id]/nutrition/actions.ts` - a trainer setting a client's daily nutrition targets
+- `src/app/client/nutrition/actions.ts` - a client logging food eaten, re-logging a previous entry, and deleting an entry
 - `src/app/invite/actions.ts` - a newly-invited client setting their password
 - `src/lib/supabase/server.ts` / `client.ts` - the regular Supabase clients (respect Row Level Security)
 - `src/lib/supabase/admin.ts` - the admin client (secret key, bypasses security rules) - only ever used server-side, only for inviting users

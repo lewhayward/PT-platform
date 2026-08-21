@@ -617,3 +617,82 @@ create policy "Trainers can view their clients' workout log sets"
       and programmes.trainer_id = auth.uid()
     )
   );
+
+-- ============================================================================
+-- Phase 5 - nutrition tracking
+-- ============================================================================
+
+-- One row per client, holding the daily targets their trainer has set.
+-- A client with no row yet just hasn't had targets set.
+create table if not exists public.nutrition_targets (
+  id uuid primary key default gen_random_uuid(),
+  trainer_id uuid not null references public.profiles (id) on delete cascade,
+  client_id uuid not null references public.profiles (id) on delete cascade,
+  daily_calories integer not null check (daily_calories > 0),
+  daily_protein_g integer not null check (daily_protein_g >= 0),
+  daily_carbs_g integer not null check (daily_carbs_g >= 0),
+  daily_fat_g integer not null check (daily_fat_g >= 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  -- Scoped to (trainer_id, client_id) rather than just client_id, matching
+  -- the same future-proofing as programmes above.
+  unique (trainer_id, client_id)
+);
+
+alter table public.nutrition_targets enable row level security;
+
+drop policy if exists "Trainers can manage own client nutrition targets" on public.nutrition_targets;
+create policy "Trainers can manage own client nutrition targets"
+  on public.nutrition_targets for all
+  to authenticated
+  using (auth.uid() = trainer_id)
+  with check (auth.uid() = trainer_id);
+
+drop policy if exists "Clients can view own nutrition targets" on public.nutrition_targets;
+create policy "Clients can view own nutrition targets"
+  on public.nutrition_targets for select
+  to authenticated
+  using (auth.uid() = client_id);
+
+-- One row per food a client has logged against a given calendar date.
+-- Deliberately not linked to any programme/plan (there's no "prescribed"
+-- side to nutrition here, unlike workout_logs) - just a plain diary entry
+-- with the calories/macros for the amount actually eaten.
+create table if not exists public.food_logs (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references public.profiles (id) on delete cascade,
+  logged_date date not null default current_date,
+  name text not null,
+  calories integer not null check (calories >= 0),
+  protein_g numeric(6,1) not null default 0 check (protein_g >= 0),
+  carbs_g numeric(6,1) not null default 0 check (carbs_g >= 0),
+  fat_g numeric(6,1) not null default 0 check (fat_g >= 0),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists food_logs_client_date_idx
+  on public.food_logs (client_id, logged_date);
+
+alter table public.food_logs enable row level security;
+
+drop policy if exists "Clients can manage own food logs" on public.food_logs;
+create policy "Clients can manage own food logs"
+  on public.food_logs for all
+  to authenticated
+  using (auth.uid() = client_id)
+  with check (auth.uid() = client_id);
+
+-- No programme/day ownership chain to lean on here (unlike workout_logs) -
+-- a food log's only real link back to a trainer is the trainer_clients
+-- relationship itself, so that's what this checks directly.
+drop policy if exists "Trainers can view their clients' food logs" on public.food_logs;
+create policy "Trainers can view their clients' food logs"
+  on public.food_logs for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.trainer_clients
+      where trainer_clients.client_id = food_logs.client_id
+      and trainer_clients.trainer_id = auth.uid()
+    )
+  );

@@ -50,13 +50,23 @@ export default async function ClientProfilePage(
         </p>
       )}
 
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <Link href={`/trainer/clients/${client.id}/programme`}>
           <Button className="w-full sm:w-auto">View programme</Button>
         </Link>
         <Link href={`/trainer/clients/${client.id}/history`}>
           <Button variant="secondary" className="w-full sm:w-auto">
             Workout history
+          </Button>
+        </Link>
+        <Link href={`/trainer/clients/${client.id}/nutrition`}>
+          <Button variant="secondary" className="w-full sm:w-auto">
+            Nutrition targets
+          </Button>
+        </Link>
+        <Link href={`/trainer/clients/${client.id}/nutrition/history`}>
+          <Button variant="secondary" className="w-full sm:w-auto">
+            Nutrition history
           </Button>
         </Link>
       </div>

@@ -5,6 +5,44 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DAY_LABELS, getTodayDayOfWeek } from "@/lib/types";
 
+async function NutritionSummary({
+  supabase,
+  clientId,
+}: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  clientId: string;
+}) {
+  const { data: targets } = await supabase
+    .from("nutrition_targets")
+    .select("daily_calories")
+    .eq("client_id", clientId)
+    .maybeSingle();
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const { data: logs } = await supabase
+    .from("food_logs")
+    .select("calories")
+    .eq("client_id", clientId)
+    .eq("logged_date", todayIso);
+
+  const caloriesLogged = (logs ?? []).reduce((sum, l) => sum + l.calories, 0);
+
+  return (
+    <Card className="mt-6 flex items-center justify-between gap-4">
+      <div>
+        <p className="font-medium text-foreground">Nutrition</p>
+        <p className="text-sm text-muted">
+          {caloriesLogged} kcal logged today
+          {targets ? ` / ${targets.daily_calories}` : ""}
+        </p>
+      </div>
+      <Link href="/client/nutrition">
+        <Button variant="secondary">Log food</Button>
+      </Link>
+    </Card>
+  );
+}
+
 export default async function ClientDashboardPage() {
   const profile = await requireProfile("client");
   const supabase = await createClient();
@@ -25,6 +63,7 @@ export default async function ClientDashboardPage() {
             Nothing here yet - your trainer hasn&apos;t assigned anything.
           </p>
         </Card>
+        <NutritionSummary supabase={supabase} clientId={profile.id} />
       </div>
     );
   }
@@ -124,6 +163,8 @@ export default async function ClientDashboardPage() {
           </div>
         </>
       )}
+
+      <NutritionSummary supabase={supabase} clientId={profile.id} />
     </div>
   );
 }
