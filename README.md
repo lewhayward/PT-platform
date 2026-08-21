@@ -116,7 +116,7 @@ If all of that works, Phase 4 is solid.
 
 1. **Log in as a trainer**, open a client's profile, and click **Nutrition targets**. Set a daily calorie target and protein/carbs/fat targets in grams, then save.
 2. **Log in as that client** (or open an incognito window) - their dashboard should show a "Nutrition" card. Click **Log food**.
-3. Type in a food name plus its calories and macros, and **Log food**. It should appear under "Logged today", and the totals at the top should update against the targets you set.
+3. Type in a food name, optionally the amount in grams, plus its calories and macros, and **Log food**. It should appear under "Logged today" (with the gram amount shown if you entered one), and the totals at the top should update against the targets you set.
 4. **Log the same food again**: it should now appear under "Recently logged" - click the **+** next to it. It should be added again with the same values, no retyping needed.
 5. **Remove an entry**: click **Remove** on a logged item - it should disappear and the totals should update.
 6. **Log in as that client's trainer** again, open their profile, and click **Nutrition history**. You should see today listed with the totals vs. targets you'd expect.
