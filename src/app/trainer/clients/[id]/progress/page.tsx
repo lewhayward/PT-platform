@@ -13,22 +13,29 @@ export default async function TrainerProgressPage(
   const { id } = await props.params;
   const supabase = await createClient();
 
-  const { data: client } = await supabase
+  const { data: client, error: clientError } = await supabase
     .from("trainer_clients")
     .select("id, client_id, email")
     .eq("id", id)
     .eq("trainer_id", trainer.id)
     .maybeSingle();
 
+  if (clientError) {
+    throw new Error(clientError.message);
+  }
   if (!client) {
     notFound();
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("full_name")
     .eq("id", client.client_id)
     .single();
+
+  if (profileError) {
+    throw new Error(profileError.message);
+  }
 
   const clientName = profile?.full_name ?? client.email;
 
@@ -43,16 +50,20 @@ export default async function TrainerProgressPage(
     throw new Error(targetError.message);
   }
 
-  const { data: weightLogs, error: weightError } = await supabase
+  // Fetched most-recent-first then reversed - see the matching comment on
+  // the client's own progress page for why ascending+limit would silently
+  // return the OLDEST entries instead once a client has more than 180.
+  const { data: weightLogsDesc, error: weightError } = await supabase
     .from("weight_logs")
     .select("logged_date, weight_kg")
     .eq("client_id", client.client_id)
-    .order("logged_date", { ascending: true })
+    .order("logged_date", { ascending: false })
     .limit(180);
 
   if (weightError) {
     throw new Error(weightError.message);
   }
+  const weightLogs = weightLogsDesc ? [...weightLogsDesc].reverse() : weightLogsDesc;
 
   const chartPoints = (weightLogs ?? []).map((w) => ({
     date: w.logged_date,
@@ -78,6 +89,12 @@ export default async function TrainerProgressPage(
 
   if (signError) {
     throw new Error(signError.message);
+  }
+
+  for (const u of signedUrls ?? []) {
+    if (u.error) {
+      console.error("Failed to sign progress photo URL:", u.path, u.error);
+    }
   }
 
   const urlByPath = new Map(

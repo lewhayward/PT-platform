@@ -12,21 +12,29 @@ export default async function NutritionTargetsPage(
   const { id } = await props.params;
   const supabase = await createClient();
 
-  const { data: client } = await supabase
+  const { data: client, error: clientError } = await supabase
     .from("trainer_clients")
     .select("id, client_id, email")
     .eq("id", id)
-    .single();
+    .eq("trainer_id", trainer.id)
+    .maybeSingle();
 
+  if (clientError) {
+    throw new Error(clientError.message);
+  }
   if (!client) {
     notFound();
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("full_name")
     .eq("id", client.client_id)
     .single();
+
+  if (profileError) {
+    throw new Error(profileError.message);
+  }
 
   const clientName = profile?.full_name ?? client.email;
 

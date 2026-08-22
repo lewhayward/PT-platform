@@ -906,8 +906,20 @@ create table if not exists public.progress_photos (
   client_id uuid not null references public.profiles (id) on delete cascade,
   logged_date date not null default current_date,
   storage_path text not null unique,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- The whole storage access model rests on storage_path's first segment
+  -- being this row's own client_id (see the storage.objects policies
+  -- below) - this makes that invariant a real database guarantee instead
+  -- of something only the app code happens to get right, so a client can
+  -- never point their own row at a path under another client's folder.
+  constraint progress_photos_path_scoped check (storage_path like client_id::text || '/%')
 );
+
+alter table public.progress_photos drop constraint if exists progress_photos_path_scoped;
+alter table public.progress_photos add constraint progress_photos_path_scoped check (storage_path like client_id::text || '/%');
+
+create index if not exists progress_photos_client_created_idx
+  on public.progress_photos (client_id, created_at desc);
 
 alter table public.progress_photos enable row level security;
 
@@ -933,10 +945,30 @@ create policy "Trainers can view their clients' progress photo records"
 -- Progress photos are personal, so the bucket is private (not "public") -
 -- every read goes through a signed URL generated server-side for someone
 -- RLS has already confirmed is allowed to see it, rather than a guessable
--- public URL.
-insert into storage.buckets (id, name, public)
-values ('progress-photos', 'progress-photos', false)
-on conflict (id) do nothing;
+-- public URL. file_size_limit/allowed_mime_types are enforced by Storage
+-- itself, not just the app's own checks in uploadProgressPhoto - the
+-- publishable key is public, so a request could otherwise hit the Storage
+-- API directly with any size/type. "on conflict ... do update" (not "do
+-- nothing") so re-running this file after a future change to these limits
+-- actually takes effect, matching every other statement in this file being
+-- safe AND meaningful to re-run.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'progress-photos',
+  'progress-photos',
+  false,
+  8388608,
+  array['image/jpeg', 'image/png', 'image/webp', 'image/heic']
+)
+on conflict (id) do update
+  set public = excluded.public,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+-- Almost certainly already on by default in a hosted Supabase project, but
+-- cheap to state explicitly rather than depend on a platform default this
+-- file doesn't otherwise control.
+alter table storage.objects enable row level security;
 
 -- Objects are stored as "<client_id>/<filename>" - these policies key off
 -- that first path segment, matching the ownership model used everywhere

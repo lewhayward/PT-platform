@@ -11,16 +11,21 @@ export default async function ClientProgressPage() {
   const profile = await requireProfile("client");
   const supabase = await createClient();
 
-  const { data: weightLogs, error: weightError } = await supabase
+  // Fetched most-recent-first then reversed for display - ordering
+  // ascending with a limit would return the OLDEST 180 entries instead
+  // (PostgREST applies ORDER BY before LIMIT), silently freezing the chart
+  // and "current weight" once a client passes ~6 months of daily weigh-ins.
+  const { data: weightLogsDesc, error: weightError } = await supabase
     .from("weight_logs")
     .select("logged_date, weight_kg")
     .eq("client_id", profile.id)
-    .order("logged_date", { ascending: true })
+    .order("logged_date", { ascending: false })
     .limit(180);
 
   if (weightError) {
     throw new Error(weightError.message);
   }
+  const weightLogs = weightLogsDesc ? [...weightLogsDesc].reverse() : weightLogsDesc;
 
   // Ordered + limited to one rather than .maybeSingle() - progress_targets
   // is keyed by (trainer_id, client_id), not client_id alone, so a client
@@ -56,6 +61,15 @@ export default async function ClientProgressPage() {
 
   if (signError) {
     throw new Error(signError.message);
+  }
+
+  // A per-path failure here (a missing object, an RLS refusal) isn't
+  // reflected in the top-level signError above - without logging it, a
+  // broken photo would just render "Unavailable" with no trace of why.
+  for (const u of signedUrls ?? []) {
+    if (u.error) {
+      console.error("Failed to sign progress photo URL:", u.path, u.error);
+    }
   }
 
   const urlByPath = new Map(

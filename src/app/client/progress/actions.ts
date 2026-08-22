@@ -71,19 +71,43 @@ export async function uploadProgressPhoto(
     return { message: "That image is too large - use one under 8MB." };
   }
 
+  // Storage's own file_size_limit/allowed_mime_types (see schema.sql) are
+  // what actually stop a crafted request bypassing the checks above - this
+  // is a separate guard against unbounded COUNT, which nothing else here
+  // limits.
+  const { count, error: countError } = await supabase
+    .from("progress_photos")
+    .select("id", { count: "exact", head: true })
+    .eq("client_id", profile.id);
+
+  if (countError) {
+    return { message: countError.message };
+  }
+  if ((count ?? 0) >= 200) {
+    return {
+      message: "You've reached the 200-photo limit - remove some older ones first.",
+    };
+  }
+
   const todayIso = new Date().toISOString().slice(0, 10);
   // Stored as "<client_id>/<filename>" - the storage RLS policies key off
   // that first path segment to decide who can read/write it (see
   // schema.sql), so this exact shape is load-bearing, not cosmetic.
-  const path = `${profile.id}/${Date.now()}-${safeFileName(file.name)}`;
+  const requestedPath = `${profile.id}/${Date.now()}-${safeFileName(file.name)}`;
 
-  const { error: uploadError } = await supabase.storage
+  const { data: uploaded, error: uploadError } = await supabase.storage
     .from("progress-photos")
-    .upload(path, file, { contentType: file.type });
+    .upload(requestedPath, file, { contentType: file.type });
 
   if (uploadError) {
     return { message: uploadError.message };
   }
+
+  // Storage can normalise the key it actually writes (e.g. stripping a
+  // stray leading/trailing slash) - recording ITS path rather than the one
+  // we asked for means the two can never silently drift apart and break
+  // the later signed-URL lookup.
+  const path = uploaded.path;
 
   const { error: insertError } = await supabase.from("progress_photos").insert({
     client_id: profile.id,
@@ -95,14 +119,17 @@ export async function uploadProgressPhoto(
     // The upload already happened, so without this the object would sit
     // in storage with no record pointing at it (invisible in the UI,
     // wasting space forever). Best-effort and logged only - the original
-    // insertError is still what gets shown to the user.
-    const { error: cleanupError } = await supabase.storage
+    // insertError is still what gets shown to the user. Storage's
+    // remove() returns 200 with an EMPTY array (not an error) when
+    // nothing was actually deleted, so success is checked on the
+    // returned list, not just the absence of `error`.
+    const { data: removed, error: cleanupError } = await supabase.storage
       .from("progress-photos")
       .remove([path]);
-    if (cleanupError) {
+    if (cleanupError || !removed?.length) {
       console.error(
         "Failed to clean up orphaned photo upload:",
-        cleanupError.message
+        cleanupError?.message ?? "remove() reported nothing deleted"
       );
     }
     return { message: insertError.message };
@@ -130,17 +157,12 @@ export async function deleteProgressPhoto(photoId: string) {
     throw new Error("Photo not found.");
   }
 
-  // Storage object removed before the database row - if this fails, we
-  // bail before touching the row, so the record never points at a photo
-  // that's already gone.
-  const { error: storageError } = await supabase.storage
-    .from("progress-photos")
-    .remove([photo.storage_path]);
-
-  if (storageError) {
-    throw new Error(storageError.message);
-  }
-
+  // Database row removed BEFORE the storage object - the reverse order
+  // fails worse: a storage delete that succeeds followed by a database
+  // delete that fails would leave a row permanently pointing at a photo
+  // that's already gone (a visible, un-fixable "Unavailable" tile). This
+  // order's failure mode is an orphaned file sitting in storage - invisible
+  // and easy to reclaim later, same reasoning as the upload cleanup above.
   const { error: dbError } = await supabase
     .from("progress_photos")
     .delete()
@@ -149,6 +171,17 @@ export async function deleteProgressPhoto(photoId: string) {
 
   if (dbError) {
     throw new Error(dbError.message);
+  }
+
+  const { data: removed, error: storageError } = await supabase.storage
+    .from("progress-photos")
+    .remove([photo.storage_path]);
+
+  if (storageError || !removed?.length) {
+    console.error(
+      "Failed to remove progress photo file:",
+      storageError?.message ?? "remove() reported nothing deleted"
+    );
   }
 
   revalidatePath("/client/progress");
