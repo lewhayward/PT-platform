@@ -965,10 +965,11 @@ on conflict (id) do update
       file_size_limit = excluded.file_size_limit,
       allowed_mime_types = excluded.allowed_mime_types;
 
--- Almost certainly already on by default in a hosted Supabase project, but
--- cheap to state explicitly rather than depend on a platform default this
--- file doesn't otherwise control.
-alter table storage.objects enable row level security;
+-- RLS is already enabled on storage.objects by default on every hosted
+-- Supabase project (it's set up by Supabase's own internal migrations,
+-- which your project role doesn't own) - explicitly re-enabling it here
+-- errors with "must be owner of table objects", so this relies on that
+-- platform default rather than restating it.
 
 -- Objects are stored as "<client_id>/<filename>" - these policies key off
 -- that first path segment, matching the ownership model used everywhere
