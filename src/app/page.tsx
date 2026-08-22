@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { DecorativeMedallion } from "@/components/decorative-medallion";
 
 // Signed-in visitors never see this - proxy.ts redirects them straight to
 // their dashboard. This is just the gateway for signed-out visitors.
 export default function Home() {
   return (
-    <div className="flex min-h-screen flex-1 flex-col items-center justify-center px-4 text-center animate-fade-in">
-      <p className="text-xs font-medium uppercase tracking-[0.2em] text-accent">
+    <div className="relative flex min-h-screen flex-1 flex-col items-center justify-center overflow-hidden px-4 text-center animate-fade-in">
+      <DecorativeMedallion className="-top-40 left-1/2 h-[36rem] w-[36rem] -translate-x-1/2" />
+      <p className="relative text-xs font-medium uppercase tracking-[0.2em] text-accent">
         PT Platform
       </p>
       <h1 className="mt-4 max-w-md text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">

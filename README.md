@@ -155,6 +155,12 @@ backgrounds, a warm gold accent, and an elegant serif for headings
 a visitor's system light/dark preference, so the premium feel stays
 consistent for everyone.
 
+A faint film-grain texture and a recurring gold sunburst motif
+(`src/components/decorative-medallion.tsx`) add some visual richness to
+shared "chrome" - the landing hero, the login/sign-up cards, the
+trainer/client header - without ever sitting behind actual data, so it
+never competes with anything a trainer or client is trying to read.
+
 The app icons in `public/` are still generic placeholders (they weren't
 part of this pass, since generating new image assets isn't something this
 tool can do). Swap `public/icon-192.png`, `public/icon-512.png`, and

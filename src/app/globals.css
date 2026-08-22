@@ -55,11 +55,27 @@ body::before {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: -2;
   pointer-events: none;
   background:
     radial-gradient(ellipse 60% 40% at 50% -10%, rgba(201, 162, 77, 0.10), transparent 60%),
     radial-gradient(ellipse 50% 30% at 100% 100%, rgba(201, 162, 77, 0.05), transparent 60%);
+}
+
+/* A very fine film-grain texture over the whole app - the difference
+   between a flat vector fill and a surface that feels like it has some
+   material quality to it. Grayscale turbulence blended with "overlay" so
+   it only ever modulates the existing colours, never adds visible colour
+   noise of its own. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 @layer base {
@@ -129,4 +145,19 @@ body::before {
   .animate-fade-in {
     animation: none;
   }
+}
+
+/* A faint radiating sunburst, used by <DecorativeMedallion> as a quiet
+   recurring motif on shared "chrome" (the dashboard header, auth cards,
+   the landing hero) - never placed behind real content/data, just in the
+   corners of frames everyone passes through. Masked to a soft circle so
+   it dissolves at the edges rather than ending in a hard line. */
+.bg-medallion {
+  background-image: repeating-conic-gradient(
+    from 0deg,
+    var(--accent) 0deg 1.2deg,
+    transparent 1.2deg 9deg
+  );
+  mask-image: radial-gradient(circle, black 0%, transparent 72%);
+  -webkit-mask-image: radial-gradient(circle, black 0%, transparent 72%);
 }
