@@ -1,4 +1,4 @@
-# PT Platform
+# Trainr
 
 A web app for personal trainers to manage clients, workouts, nutrition and
 progress tracking in one place.

@@ -1,5 +1,5 @@
 -- ============================================================================
--- PT Platform - Phase 1 database schema
+-- Trainr - Phase 1 database schema
 --
 -- HOW TO RUN THIS:
 -- 1. Open your project at https://supabase.com/dashboard

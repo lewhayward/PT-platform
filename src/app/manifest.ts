@@ -6,8 +6,8 @@ import type { MetadataRoute } from "next";
 // you're ready.
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "PT Platform",
-    short_name: "PT Platform",
+    name: "Trainr",
+    short_name: "Trainr",
     description:
       "Workouts, nutrition and progress tracking for trainers and their clients.",
     start_url: "/",

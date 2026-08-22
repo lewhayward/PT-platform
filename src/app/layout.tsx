@@ -21,11 +21,11 @@ const playfairDisplay = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "PT Platform",
+  title: "Trainr",
   description: "Workouts, nutrition and progress tracking for trainers and their clients.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
-    title: "PT Platform",
+    title: "Trainr",
     statusBarStyle: "default",
   },
 };

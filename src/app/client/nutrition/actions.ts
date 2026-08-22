@@ -185,7 +185,7 @@ export async function lookupBarcode(
     response = await fetch(
       `https://world.openfoodfacts.org/api/v2/product/${barcode}.json?fields=code,product_name,nutriments`,
       {
-        headers: { "User-Agent": "PT-Platform-App/1.0" },
+        headers: { "User-Agent": "Trainr-App/1.0" },
         signal: AbortSignal.timeout(5000),
       }
     );

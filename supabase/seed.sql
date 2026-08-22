@@ -1,5 +1,5 @@
 -- ============================================================================
--- PT Platform - exercise library & starter programme content
+-- Trainr - exercise library & starter programme content
 --
 -- HOW TO RUN THIS:
 -- Run this AFTER schema.sql (it needs the tables schema.sql creates).
