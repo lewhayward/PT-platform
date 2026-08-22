@@ -9,8 +9,7 @@ progress tracking in one place.
 - **Phase 3**: trainers can build a client's weekly workout programme, with a built-in exercise library, suggested starter programmes, and easy re-use of workouts already built
 - **Phase 4**: clients log what they actually did (reps/weight per set) against their assigned workout, and trainers can see completed vs. assigned per client
 - **Phase 5**: trainers set daily calorie/macro targets per client, clients log food eaten (with a one-tap "log again" for anything eaten before), and trainers can see day-by-day nutrition history vs. targets. Includes a built-in library of ~100 common foods (auto-fills calories/macros once you type a food and a gram amount) and a barcode scanner for packaged foods
-
-No progress-tracking features yet - that comes in a later phase.
+- **Phase 6**: trainers set a target weight per client, clients log their weight and optional progress photos, and both can see a weight-over-time chart against that target
 
 ## 1. Create your Supabase project
 
@@ -31,10 +30,13 @@ No progress-tracking features yet - that comes in a later phase.
 - `workout_logs` and related tables for Phase 4's workout logging
 - `nutrition_targets` and `food_logs` for Phase 5's nutrition tracking
 - `foods`, a shared library of common foods with per-100g calories/macros, seeded with ~100 everyday items and grown automatically whenever someone scans a new barcode
+- `weight_logs` and `progress_targets` for Phase 6's weight tracking, plus a private `progress-photos` file storage bucket (created automatically by `schema.sql` - no extra setup needed in the Supabase dashboard) for optional progress photos
 
 Both files are safe to re-run any time (e.g. after pulling an update) - they won't duplicate data or wipe anything a trainer or client has already entered.
 
 **A note on barcode scanning**: it uses the phone/browser's built-in barcode reader (no extra app or library needed), but not every browser supports this yet - notably some versions of Safari on iPhone don't. Where it isn't supported, the scan button automatically falls back to a "type the barcode number" box instead, which still looks the product up the same way - just without the camera step.
+
+**A note on progress photos**: they're stored privately (not publicly accessible URLs) - every photo is only ever shown via a short-lived signed link generated for someone Row Level Security has actually confirmed is allowed to see it (the client themselves, or their own trainer).
 
 ## 3. Add your environment variables
 
@@ -129,6 +131,18 @@ If all of that works, Phase 4 is solid.
 
 If all of that works, Phase 5 is solid.
 
+## How to test Phase 6
+
+1. **Log in as a trainer**, open a client's profile, and click **Progress**. Set a target weight in kg and save.
+2. **Log in as that client** (or open an incognito window) - their dashboard should show a "Progress" card. Click **View progress**.
+3. **Log a weight**: enter today's weight in kg and save. A progress bar towards the target should appear, and the weight trend chart below should show your point plotted against a dashed target line.
+4. **Log again today**: change the number and save again - it should update today's point rather than adding a second one for the same day.
+5. **Upload a progress photo** (optional): choose an image and upload it. It should appear in the photo grid below, with a **Remove** button.
+6. **Log in as that client's trainer** again, open their profile, and click **Progress**. You should see the same weight trend and target, plus the client's photos (view-only - no remove button on the trainer's side).
+7. **Check the guard**: while logged in as a different trainer, try visiting another trainer's client's progress page directly via URL - you should get a "not found" page.
+
+If all of that works, Phase 6 is solid.
+
 ## Project structure
 
 - `src/app/` - pages and routes (Next.js App Router)
@@ -137,10 +151,12 @@ If all of that works, Phase 5 is solid.
 - `src/app/trainer/clients/[id]/programme/actions.ts` - building, editing, and reusing a client's workout programme
 - `src/app/client/log/actions.ts` - a client logging what they actually did against today's plan
 - `src/app/trainer/clients/[id]/nutrition/actions.ts` - a trainer setting a client's daily nutrition targets
-- `src/app/client/nutrition/actions.ts` - a client logging food eaten, re-logging a previous entry, and deleting an entry
+- `src/app/client/nutrition/actions.ts` - a client logging food eaten, re-logging a previous entry, deleting an entry, and looking up a scanned barcode
+- `src/app/trainer/clients/[id]/progress/actions.ts` - a trainer setting a client's target weight
+- `src/app/client/progress/actions.ts` - a client logging their weight and uploading/deleting progress photos
 - `src/app/invite/actions.ts` - a newly-invited client setting their password
 - `src/lib/supabase/server.ts` / `client.ts` - the regular Supabase clients (respect Row Level Security)
-- `src/lib/supabase/admin.ts` - the admin client (secret key, bypasses security rules) - only ever used server-side, only for inviting users
+- `src/lib/supabase/admin.ts` - the admin client (secret key, bypasses security rules) - only ever used server-side, for inviting users and caching a barcode lookup into the shared food library
 - `src/lib/supabase/dal.ts` - the "Data Access Layer" that checks who's logged in and what they're allowed to see
 - `src/proxy.ts` - runs before every page request to keep sessions fresh and enforce redirects (Next.js 16 renamed "middleware" to "proxy")
 - `src/components/` - shared, reusable pieces of UI

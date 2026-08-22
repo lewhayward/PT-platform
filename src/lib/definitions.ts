@@ -271,3 +271,45 @@ export type FoodLogFormState =
       savedAt?: number;
     }
   | undefined;
+
+export const WeightLogSchema = z.object({
+  weightKg: requiredCoercedNumber(
+    z.coerce
+      .number({ error: "Enter your weight in kg." })
+      .min(20, { error: "That looks too low - use 20kg or more." })
+      .max(400, { error: "That looks too high - use 400kg or less." })
+  ),
+});
+
+export type WeightLogFormState =
+  | {
+      errors?: { weightKg?: string[] };
+      message?: string;
+    }
+  | undefined;
+
+export const ProgressTargetSchema = z.object({
+  targetWeightKg: requiredCoercedNumber(
+    z.coerce
+      .number({ error: "Enter a target weight in kg." })
+      .min(20, { error: "That looks too low - use 20kg or more." })
+      .max(400, { error: "That looks too high - use 400kg or less." })
+  ),
+});
+
+export type ProgressTargetFormState =
+  | {
+      errors?: { targetWeightKg?: string[] };
+      message?: string;
+    }
+  | undefined;
+
+export type PhotoUploadFormState =
+  | {
+      message?: string;
+      // Set on success only - the file input's `key` is bound to this so
+      // it remounts and clears after an upload. File inputs can't have
+      // their value cleared programmatically any other way.
+      savedAt?: number;
+    }
+  | undefined;

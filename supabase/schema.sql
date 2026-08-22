@@ -811,3 +811,159 @@ create policy "Anyone signed in can view foods"
 -- entirely - the CHECK constraints above are what actually keep that
 -- write's values sane, not a policy.
 drop policy if exists "Anyone signed in can cache a barcode lookup" on public.foods;
+
+-- ============================================================================
+-- Phase 6 - progress tracking
+-- ============================================================================
+
+-- One entry per client per calendar date - weighing in again today updates
+-- today's entry rather than creating a second point for the same day,
+-- which would just look like a glitch on a trend line. Stored in kg only
+-- (no per-user unit preference yet) - keeps the schema and every chart
+-- simple; converting for display would be a UI-only change later if needed.
+create table if not exists public.weight_logs (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references public.profiles (id) on delete cascade,
+  logged_date date not null default current_date,
+  weight_kg numeric(5,1) not null check (weight_kg > 0 and weight_kg < 500),
+  created_at timestamptz not null default now(),
+  unique (client_id, logged_date)
+);
+
+alter table public.weight_logs enable row level security;
+
+drop policy if exists "Clients can manage own weight logs" on public.weight_logs;
+create policy "Clients can manage own weight logs"
+  on public.weight_logs for all
+  to authenticated
+  using (auth.uid() = client_id)
+  with check (auth.uid() = client_id);
+
+drop policy if exists "Trainers can view their clients' weight logs" on public.weight_logs;
+create policy "Trainers can view their clients' weight logs"
+  on public.weight_logs for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.trainer_clients
+      where trainer_clients.client_id = weight_logs.client_id
+      and trainer_clients.trainer_id = auth.uid()
+    )
+  );
+
+-- The target a trainer and client have agreed on. Progress toward it is
+-- computed at display time from (starting weight, current weight, target) -
+-- that single formula works whether the goal is to lose or gain, so there's
+-- no separate "direction" field to keep in sync with reality.
+create table if not exists public.progress_targets (
+  id uuid primary key default gen_random_uuid(),
+  trainer_id uuid not null references public.profiles (id) on delete cascade,
+  client_id uuid not null references public.profiles (id) on delete cascade,
+  target_weight_kg numeric(5,1) not null check (target_weight_kg > 0 and target_weight_kg < 500),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (trainer_id, client_id)
+);
+
+alter table public.progress_targets enable row level security;
+
+-- Requires trainer_id AND that client_id is actually one of this trainer's
+-- own clients (via trainer_clients) - the same gap closed on nutrition
+-- targets in Phase 5, built correctly here from the start rather than as a
+-- follow-up fix.
+drop policy if exists "Trainers can manage own client progress targets" on public.progress_targets;
+create policy "Trainers can manage own client progress targets"
+  on public.progress_targets for all
+  to authenticated
+  using (
+    auth.uid() = trainer_id
+    and exists (
+      select 1 from public.trainer_clients
+      where trainer_clients.client_id = progress_targets.client_id
+      and trainer_clients.trainer_id = auth.uid()
+    )
+  )
+  with check (
+    auth.uid() = trainer_id
+    and exists (
+      select 1 from public.trainer_clients
+      where trainer_clients.client_id = progress_targets.client_id
+      and trainer_clients.trainer_id = auth.uid()
+    )
+  );
+
+drop policy if exists "Clients can view own progress target" on public.progress_targets;
+create policy "Clients can view own progress target"
+  on public.progress_targets for select
+  to authenticated
+  using (auth.uid() = client_id);
+
+-- A record of an uploaded progress photo. Optional and freeform (unlike
+-- weight_logs, no unique-per-day constraint) - a client might upload a
+-- front/side/back set on the same day, or go weeks without one.
+create table if not exists public.progress_photos (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references public.profiles (id) on delete cascade,
+  logged_date date not null default current_date,
+  storage_path text not null unique,
+  created_at timestamptz not null default now()
+);
+
+alter table public.progress_photos enable row level security;
+
+drop policy if exists "Clients can manage own progress photo records" on public.progress_photos;
+create policy "Clients can manage own progress photo records"
+  on public.progress_photos for all
+  to authenticated
+  using (auth.uid() = client_id)
+  with check (auth.uid() = client_id);
+
+drop policy if exists "Trainers can view their clients' progress photo records" on public.progress_photos;
+create policy "Trainers can view their clients' progress photo records"
+  on public.progress_photos for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.trainer_clients
+      where trainer_clients.client_id = progress_photos.client_id
+      and trainer_clients.trainer_id = auth.uid()
+    )
+  );
+
+-- Progress photos are personal, so the bucket is private (not "public") -
+-- every read goes through a signed URL generated server-side for someone
+-- RLS has already confirmed is allowed to see it, rather than a guessable
+-- public URL.
+insert into storage.buckets (id, name, public)
+values ('progress-photos', 'progress-photos', false)
+on conflict (id) do nothing;
+
+-- Objects are stored as "<client_id>/<filename>" - these policies key off
+-- that first path segment, matching the ownership model used everywhere
+-- else in this file (a client manages their own, a trainer can view their
+-- own clients' via trainer_clients).
+drop policy if exists "Clients can manage own progress photo files" on storage.objects;
+create policy "Clients can manage own progress photo files"
+  on storage.objects for all
+  to authenticated
+  using (
+    bucket_id = 'progress-photos'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  )
+  with check (
+    bucket_id = 'progress-photos'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "Trainers can view their clients' progress photo files" on storage.objects;
+create policy "Trainers can view their clients' progress photo files"
+  on storage.objects for select
+  to authenticated
+  using (
+    bucket_id = 'progress-photos'
+    and exists (
+      select 1 from public.trainer_clients
+      where trainer_clients.client_id::text = (storage.foldername(name))[1]
+      and trainer_clients.trainer_id = auth.uid()
+    )
+  );

@@ -72,6 +72,11 @@ export default async function ClientProfilePage(
             Nutrition history
           </Button>
         </Link>
+        <Link href={`/trainer/clients/${client.id}/progress`}>
+          <Button variant="secondary" className="w-full sm:w-auto">
+            Progress
+          </Button>
+        </Link>
       </div>
 
       <Card className="mt-6 flex flex-col gap-6">

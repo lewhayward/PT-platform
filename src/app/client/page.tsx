@@ -56,6 +56,40 @@ async function NutritionSummary({
   );
 }
 
+async function ProgressSummary({
+  supabase,
+  clientId,
+}: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  clientId: string;
+}) {
+  const { data: latest, error: latestError } = await supabase
+    .from("weight_logs")
+    .select("weight_kg")
+    .eq("client_id", clientId)
+    .order("logged_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (latestError) {
+    throw new Error(latestError.message);
+  }
+
+  return (
+    <Card className="mt-4 flex items-center justify-between gap-4">
+      <div>
+        <p className="font-medium text-foreground">Progress</p>
+        <p className="text-sm text-muted">
+          {latest ? `${latest.weight_kg}kg logged` : "No weight logged yet"}
+        </p>
+      </div>
+      <Link href="/client/progress">
+        <Button variant="secondary">View progress</Button>
+      </Link>
+    </Card>
+  );
+}
+
 export default async function ClientDashboardPage() {
   const profile = await requireProfile("client");
   const supabase = await createClient();
@@ -77,6 +111,7 @@ export default async function ClientDashboardPage() {
           </p>
         </Card>
         <NutritionSummary supabase={supabase} clientId={profile.id} />
+        <ProgressSummary supabase={supabase} clientId={profile.id} />
       </div>
     );
   }
@@ -178,6 +213,7 @@ export default async function ClientDashboardPage() {
       )}
 
       <NutritionSummary supabase={supabase} clientId={profile.id} />
+      <ProgressSummary supabase={supabase} clientId={profile.id} />
     </div>
   );
 }

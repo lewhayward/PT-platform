@@ -195,3 +195,24 @@ export interface FoodLog {
   carbs_g: number;
   fat_g: number;
 }
+
+export interface WeightLog {
+  id: string;
+  client_id: string;
+  logged_date: string;
+  weight_kg: number;
+}
+
+export interface ProgressTarget {
+  id: string;
+  trainer_id: string;
+  client_id: string;
+  target_weight_kg: number;
+}
+
+export interface ProgressPhoto {
+  id: string;
+  client_id: string;
+  logged_date: string;
+  storage_path: string;
+}
